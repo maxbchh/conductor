@@ -29,7 +29,7 @@
    <div class="panel-head"><div><p class="eyebrow">НОВАЯ ПРОДАЖА</p><h2>Параметры билета</h2></div><span class="step-pill">01 / 03</span></div>
    <div class="field-grid">
     <label class="field full"><span>Маршрут</span><select id="saleRoute"></select></label>
-    <label class="field"><span>Откуда</span><select id="saleFrom"></select></label>
+    <label class="field"><span>Откуда</span><select id="saleFrom"></select><button id="cashNextStop" class="secondary-btn compact" type="button" disabled>Следующая остановка →</button></label>
     <label class="field"><span>Куда</span><select id="saleTo"></select></label>
     <label class="field"><span>Тариф</span><select id="saleFare"><option value="1">Полный · 100%</option><option value=".5">Льготный · 50%</option><option value=".75">Школьный · 75%</option></select></label>
     <label class="field"><span>Количество</span><div class="quantity"><button id="qtyMinus" type="button">−</button><input id="saleQty" type="number" min="1" max="20" value="1"><button id="qtyPlus" type="button">+</button></div></label>
@@ -56,8 +56,8 @@
    <label class="field"><span>Подвижной состав</span><select id="tripVehicle"></select></label>
    <label class="field"><span>Игровое время</span><input id="tripGameTime" type="time" value="08:00"></label><label class="field full"><span>Автобус вручную (если его нет в базе)</span><input id="tripManualVehicle" placeholder="Например: МАЗ 103 · борт 102"></label>
   </div>
-  <div class="trip-actions"><button id="startShift" class="primary-btn" type="button">Открыть смену →</button><button id="endShift" class="danger-btn" type="button" disabled>Завершить смену</button></div>
-  <div id="liveRouteControls" class="field-grid"><label class="field"><span>Маршрут текущего рейса</span><select id="liveRoute"></select></label><label class="field"><span>Текущая остановка</span><select id="liveCurrentStop"></select></label><label class="field"><span>Конец рейса (любая остановка)</span><select id="liveEndStop"></select></label><div id="liveRouteSummary" class="route-summary">Выбери маршрут — появятся начальная и конечная остановки</div></div><p class="hint">Сначала открывается смена. После этого назначь маршрут и при необходимости конечную остановку.</p>
+  <div class="trip-actions"><button id="startShift" class="primary-btn" type="button">Открыть рейс →</button><button id="tripNextStop" class="secondary-btn" type="button" disabled>Следующая остановка →</button><button id="endShift" class="danger-btn" type="button" disabled>Завершить рейс</button></div>
+  <div id="liveRouteControls" class="field-grid"><label class="field"><span>Маршрут текущего рейса</span><select id="liveRoute"></select></label><label class="field"><span>Текущая остановка</span><select id="liveCurrentStop"></select></label><label class="field"><span>Конец рейса (любая остановка)</span><select id="liveEndStop"></select></label><div id="liveRouteSummary" class="route-summary">Выбери маршрут — появятся начальная и конечная остановки</div></div><p class="hint">Рейс управляет подвижным составом и текущей остановкой. Для продажи билетов достаточно открытой кассовой смены.</p>
  </div>
  <div class="glass panel trip-route-editor"><div class="panel-head"><div><p class="eyebrow">МАРШРУТНАЯ СЕТЬ</p><h2>Редактор рейсов</h2><p class="muted">Создавай маршруты и добавляй остановки по порядку</p></div><button id="tripAddRoute" class="primary-btn compact" type="button">＋ Создать маршрут</button></div><div id="tripRoutesList" class="table-wrap"><div class="empty-state">Маршрутов пока нет. Создай первый маршрут.</div></div></div>
  <div class="glass panel"><div class="panel-head"><div><p class="eyebrow">ИСТОРИЯ</p><h2>Последние рейсы</h2></div></div><div id="shiftHistory" class="empty-state">Рейсов пока нет</div></div>
