@@ -87,3 +87,43 @@ alter table public.conductor_schedules enable row level security;
 drop policy if exists "Conductor public access schedules" on public.conductor_schedules;
 create policy "Conductor public access schedules" on public.conductor_schedules for all to anon,authenticated using(true) with check(true);
 grant select,insert,update,delete on public.conductor_schedules to anon,authenticated;
+
+-- Virtual cards for in-game payment simulation. Never store real card credentials.
+alter table public.conductor_shifts add column if not exists vehicle_label text;
+alter table public.conductor_tickets add column if not exists card_id text;
+create table if not exists public.conductor_cards (
+ id text primary key,
+ holder text not null,
+ label text not null,
+ balance numeric(12,2) not null default 0 check (balance >= 0),
+ created_at timestamptz not null default now(),
+ updated_at timestamptz not null default now()
+);
+alter table public.conductor_cards enable row level security;
+drop policy if exists "Conductor public access cards" on public.conductor_cards;
+create policy "Conductor public access cards" on public.conductor_cards for all to anon, authenticated using (true) with check (true);
+grant select, insert, update, delete on public.conductor_cards to anon, authenticated;
+
+create or replace function public.conductor_charge_virtual_card(p_card_id text, p_ticket_rows jsonb)
+returns jsonb language plpgsql security invoker set search_path = ''
+as $$
+declare
+ v_total numeric(12,2); v_balance numeric(12,2); v_item jsonb;
+ v_ticket public.conductor_tickets%rowtype; v_tickets jsonb := '[]'::jsonb;
+begin
+ if jsonb_typeof(p_ticket_rows) <> 'array' or jsonb_array_length(p_ticket_rows) = 0 then raise exception 'Ticket list is empty'; end if;
+ select round(sum((item->>'amount')::numeric),2) into v_total from jsonb_array_elements(p_ticket_rows) as items(item);
+ if v_total is null or v_total <= 0 then raise exception 'Invalid payment amount'; end if;
+ update public.conductor_cards set balance=balance-v_total,updated_at=now() where id=p_card_id and balance>=v_total returning balance into v_balance;
+ if not found then return jsonb_build_object('ok',false,'reason','insufficient_funds'); end if;
+ for v_item in select value from jsonb_array_elements(p_ticket_rows)
+ loop
+  insert into public.conductor_tickets (shift_id,route_id,route_name,from_stop,to_stop,stop_count,fare_type,fare_multiplier,fare_per_stop,amount,payment_method,cash_received,change_due,game_time,card_id)
+  values (v_item->>'shift_id',v_item->>'route_id',coalesce(v_item->>'route_name',''),v_item->>'from_stop',v_item->>'to_stop',(v_item->>'stop_count')::integer,v_item->>'fare_type',(v_item->>'fare_multiplier')::numeric,(v_item->>'fare_per_stop')::numeric,(v_item->>'amount')::numeric,'card',coalesce((v_item->>'cash_received')::numeric,0),coalesce((v_item->>'change_due')::numeric,0),v_item->>'game_time',p_card_id)
+  returning * into v_ticket;
+  v_tickets:=v_tickets||jsonb_build_array(to_jsonb(v_ticket));
+ end loop;
+ return jsonb_build_object('ok',true,'balance',v_balance,'tickets',v_tickets);
+end;
+$$;
+grant execute on function public.conductor_charge_virtual_card(text,jsonb) to anon,authenticated;
