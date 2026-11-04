@@ -162,3 +162,28 @@ main{min-width:0}
 .game-clock-panel button:disabled,.game-clock-panel select:disabled,.game-clock-panel input:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:900px){.game-clock-panel{align-items:flex-start;flex-direction:column}.game-clock-actions{justify-content:flex-start;width:100%}.game-clock-manual{width:100%}.game-clock-manual input{width:min(100%,260px)}}
 @media(max-width:560px){.game-clock-panel{padding:12px}.game-clock-status{min-width:0}.game-clock-actions{gap:7px}.game-clock-jumps{width:100%}.game-clock-jumps button{flex:1}.game-clock-manual{align-items:stretch;flex-direction:column}.game-clock-manual label,.game-clock-manual input{width:100%}.game-clock-manual button{width:100%}}
+
+/* Dedicated OMSI-inspired game clock workspace */
+.game-clock-workspace{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(300px,.75fr);gap:16px;align-items:stretch}
+.game-clock-hero{grid-column:1/-1;position:relative;overflow:hidden;border:1px solid #ffffffd9;border-radius:26px;padding:clamp(22px,4vw,38px);background:radial-gradient(ellipse at 85% 10%,#d9e6ffb8,transparent 38%),linear-gradient(135deg,rgba(255,255,255,.88),rgba(235,242,255,.76));box-shadow:0 18px 55px rgba(51,77,120,.10),inset 0 1px 0 #fff}
+.game-clock-hero-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.game-clock-live{display:inline-flex;align-items:center;gap:10px;color:#61718c;font-size:12px;font-weight:750}
+.game-clock-live .game-clock-dot{display:inline-block;margin:0}
+.game-clock-world{color:#99a7bd;font-size:9px;font-weight:850;letter-spacing:2px}
+.game-clock-digital{display:grid;gap:8px;padding:30px 0 28px}
+.game-clock-digital>span{font-size:clamp(48px,8vw,88px);line-height:1;font-weight:850;letter-spacing:-.065em;font-variant-numeric:tabular-nums;color:#1c2d49}
+.game-clock-digital>small{font-size:14px;color:#7e8da5;font-weight:650}
+.game-clock-main-actions{display:flex;align-items:end;gap:12px;flex-wrap:wrap}
+.game-clock-main-actions>.primary-btn{min-width:190px;min-height:44px}
+.game-clock-main-actions .game-clock-rate{min-width:min(300px,100%)}
+.game-clock-main-actions .game-clock-rate select{width:100%;min-height:44px}
+.game-clock-tools{margin:0;min-width:0}
+.game-clock-tools .panel-head{margin-bottom:16px}
+.game-clock-tools .game-clock-jumps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.game-clock-tools .game-clock-jumps button{min-height:43px}
+.game-clock-tools .game-clock-manual{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.game-clock-tools .game-clock-manual label{flex:1;min-width:180px}
+.game-clock-tools .game-clock-manual input{width:100%;min-height:43px}
+.game-clock-tools .game-clock-manual button{min-height:43px}
+.game-clock-tools button:disabled,.game-clock-tools select:disabled,.game-clock-tools input:disabled,.game-clock-hero button:disabled,.game-clock-hero select:disabled{opacity:.48;cursor:not-allowed}
+@media(max-width:760px){.game-clock-workspace{grid-template-columns:1fr}.game-clock-hero{grid-column:auto}.game-clock-world{font-size:8px;letter-spacing:1px}.game-clock-digital{padding:25px 0}.game-clock-main-actions{align-items:stretch;flex-direction:column}.game-clock-main-actions>.primary-btn{width:100%}.game-clock-main-actions .game-clock-rate{min-width:0;width:100%}}
