@@ -142,3 +142,23 @@ main{min-width:0}
 @media(prefers-reduced-motion:reduce){
  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+
+/* OMSI-style global game clock */
+.game-clock-date{display:block;margin-top:2px;color:var(--muted);font-size:10px!important;font-weight:600}
+.game-clock-panel{width:100%;max-width:1320px;margin:0 auto 14px;padding:12px 16px;border-radius:18px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.game-clock-status{display:flex;align-items:center;gap:10px;min-width:175px}
+.game-clock-status small,.game-clock-manual label span,.game-clock-rate span{display:block;color:var(--muted);font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}
+.game-clock-status b{display:block;margin-top:3px;font-size:12px}
+.game-clock-dot{width:9px;height:9px;flex:0 0 9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(27,155,112,.12)}
+.game-clock-dot.paused{background:#d79a35;box-shadow:0 0 0 4px rgba(215,154,53,.13)}
+.game-clock-actions{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
+.game-clock-rate{display:grid;gap:4px}
+.game-clock-rate select,.game-clock-manual input{min-height:34px;border:1px solid rgba(118,137,170,.22);border-radius:10px;background:rgba(255,255,255,.76);color:var(--ink);padding:6px 9px;font:inherit;font-size:12px;outline:none}
+.game-clock-jumps{display:flex;gap:5px;flex-wrap:wrap}
+.game-clock-manual{display:flex;align-items:end;gap:7px}
+.game-clock-manual label{display:grid;gap:4px}
+.game-clock-manual input{width:190px}
+.game-clock-panel button:disabled,.game-clock-panel select:disabled,.game-clock-panel input:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:900px){.game-clock-panel{align-items:flex-start;flex-direction:column}.game-clock-actions{justify-content:flex-start;width:100%}.game-clock-manual{width:100%}.game-clock-manual input{width:min(100%,260px)}}
+@media(max-width:560px){.game-clock-panel{padding:12px}.game-clock-status{min-width:0}.game-clock-actions{gap:7px}.game-clock-jumps{width:100%}.game-clock-jumps button{flex:1}.game-clock-manual{align-items:stretch;flex-direction:column}.game-clock-manual label,.game-clock-manual input{width:100%}.game-clock-manual button{width:100%}}
