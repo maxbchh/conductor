@@ -20,8 +20,27 @@
    <label class="field"><span>Количество</span><input id="payQty" type="number" min="1" max="20" value="1"></label>
   </div>
   <div class="fare-summary"><div><small>Остановок</small><b id="payStops">—</b></div><div><small>За остановку</small><b id="payPer">—</b></div><div class="sum"><small>Итого</small><b id="payTotal">0,00 BYN</b></div></div>
-  <label class="field"><span>Виртуальная карта</span><select id="payCard"><option value="">Выбери карту для оплаты</option></select></label>
-  <div class="payment-methods"><button id="payCash" class="primary-btn" type="button">Наличными</button><button id="payByCard" class="secondary-btn" type="button">Оплатить картой</button></div>
+  <section class="virtual-bank-panel">
+   <div class="virtual-bank-heading"><div><p class="eyebrow">CONDUCTOR · VIRTUAL BANK</p><h2>Виртуальный банк</h2><p>Игровые карты и баланс</p></div><span class="bank-sim-badge">ТОЛЬКО СИМУЛЯЦИЯ</span></div>
+   <div id="bankCardPreview" class="virtual-bank-card blue"><div class="bank-card-top"><b id="bankCardBank">Conductor Bank</b><span>CONDUCTOR · SIM</span></div><div id="bankCardNumber" class="bank-card-number">9900 0000 0000 0000</div><div class="bank-card-bottom"><div><small>ВЛАДЕЛЕЦ</small><b id="bankCardHolder">Виртуальная карта</b></div><div><small>БАЛАНС</small><b id="bankCardBalance">0,00 BYN</b></div></div></div>
+   <div class="bank-select-row"><label class="field"><span>Выбрать карту</span><select id="payCard"><option value="">Загрузка карт…</option></select></label><button id="payRandomCard" class="secondary-btn" type="button">↻ Случайная карта</button></div>
+   <div class="bank-actions"><label class="field"><span>Сумма операции (BYN)</span><input id="bankAmount" type="number" min="0.01" step=".01" placeholder="Например, 20.00"></label><button id="bankTopUp" class="secondary-btn" type="button" disabled>＋ Пополнить</button><button id="bankWithdraw" class="secondary-btn" type="button" disabled>− Списать</button><button id="bankEmpty" class="danger-btn" type="button" disabled>Обнулить</button></div>
+   <button id="toggleCreateCard" class="bank-create-toggle" type="button">＋ Выпустить новую виртуальную карту</button>
+   <div id="createBankCardPanel" class="bank-create-panel" hidden><div class="panel-head"><div><p class="eyebrow">НОВАЯ КАРТА</p><h3>Выпуск виртуальной карты</h3></div></div>
+    <div class="field-grid">
+     <label class="field"><span>Владелец</span><input id="newCardHolder" maxlength="80" placeholder="Имя владельца"></label>
+     <label class="field"><span>Название карты</span><input id="newCardLabel" maxlength="80" value="Моя карта"></label>
+     <label class="field full"><span>Название виртуального банка</span><input id="newCardBank" maxlength="50" value="Conductor Bank"></label>
+     <label class="field full"><span>Свой выдуманный номер · 16 цифр</span><input id="newCardNumber" inputmode="numeric" autocomplete="off" maxlength="16" placeholder="Оставь пустым для случайного номера"></label>
+     <label class="field"><span>Тип карты</span><select id="newCardType"><option>Классическая</option><option>Транспортная</option><option>Премиальная</option><option>Молодёжная</option></select></label>
+     <label class="field"><span>Дизайн карты</span><select id="newCardColor"><option value="blue">Синий</option><option value="violet">Фиолетовый</option><option value="green">Зелёный</option><option value="dark">Тёмный</option></select></label>
+     <label class="field full"><span>Начальное пополнение (BYN)</span><input id="newCardInitial" type="number" min="0" step=".01" value="0"></label>
+    </div><button id="createBankCard" class="primary-btn" type="button">Выпустить карту</button>
+   </div>
+   <div class="bank-history"><div class="bank-history-title"><b>Последние операции</b><span>История выбранной карты</span></div><div id="bankCardHistory"><div class="empty-state">Выбери карту, чтобы увидеть операции</div></div></div>
+   <p class="hint">Все карты, номера и операции вымышленные и существуют только внутри Conductor. Не вводи номера, сроки действия или коды настоящих банковских карт.</p>
+  </section>
+  <div class="payment-methods"><button id="payCash" class="primary-btn" type="button">Наличными</button><button id="payByCard" class="secondary-btn" type="button">Оплатить виртуальной картой</button></div>
   <p class="hint">Виртуальная карта — игровая симуляция с балансом из базы Conductor. Это не банковская карта и не настоящий платёж.</p>
   <div id="payResult" class="pay-result" aria-live="polite"></div>
  </section>
@@ -34,10 +53,70 @@
 const URL='https://yycaxmfljqzfkjukplkz.supabase.co',KEY='sb_publishable_Ur6yP5_7LQ-9DGmriBJIpw_zIWJiM7T';
 const $=id=>document.getElementById(id),params=new URLSearchParams(location.search),shiftId=params.get('shift'),cashShiftId=params.get('cash'),routeParam=params.get('route');
 const client=window.supabase.createClient(URL,KEY,{auth:{persistSession:false}});
-let shift=null,routes=[],cards=[],route=null;
+let shift=null,routes=[],cards=[],cardTransactions=[],route=null;
 const money=n=>Number(n||0).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' BYN';
 function toast(s,type=''){const el=$('payToast');el.textContent=s;el.className='toast show '+type;setTimeout(()=>el.classList.remove('show'),3500)}
 function fill(el,items,placeholder){el.innerHTML='<option value="">'+placeholder+'</option>';items.forEach(x=>{const o=document.createElement('option');o.value=x.value;o.textContent=x.label;el.appendChild(o)})}
+
+ function randomVirtualCardNumber(){return '9900'+Array.from({length:3},()=>String(Math.floor(Math.random()*10000)).padStart(4,'0')).join('')}
+ function displayCardNumber(n){return String(n||'').replace(/(\\d{4})(?=\\d)/g,'$1 ')}
+ function selectedCard(){return cards.find(c=>c.id===$('payCard').value)||null}
+ function renderBank(){
+  const c=selectedCard(),preview=$('bankCardPreview');
+  preview.className='virtual-bank-card '+(['blue','violet','green','dark'].includes(c?.card_color)?c.card_color:'blue');
+  $('bankCardBank').textContent=c?.bank_name||'Conductor Bank';
+  $('bankCardNumber').textContent=c?displayCardNumber(c.card_number):'ВЫБЕРИ ВИРТУАЛЬНУЮ КАРТУ';
+  $('bankCardHolder').textContent=c?.holder||'Виртуальная карта';
+  $('bankCardBalance').textContent=money(c?.balance||0);
+  ['bankAmount','bankTopUp','bankWithdraw','bankEmpty'].forEach(id=>$(id).disabled=!c);
+  $('payByCard').disabled=!c;
+  $('payByCard').textContent=c?'Оплатить виртуальной картой':'Сначала выбери карту';
+  const rows=c?cardTransactions.filter(t=>t.card_id===c.id).slice(0,8):[];
+  const labels={top_up:'Пополнение',withdrawal:'Списание',empty:'Обнуление',purchase:'Оплата билета'};
+  $('bankCardHistory').innerHTML=rows.length?rows.map(t=>'<div class="bank-history-row"><div><b>'+labels[t.transaction_type]+'</b><small>'+new Date(t.created_at).toLocaleString('ru-RU')+'</small></div><div><b>'+money(t.amount)+'</b><small>Остаток '+money(t.balance_after)+'</small></div></div>').join(''):'<div class="empty-state">Операций пока нет</div>';
+ }
+ function refillCardSelector(preferredId){
+  const current=preferredId||$('payCard').value;
+  fill($('payCard'),cards.map(c=>({value:c.id,label:(c.bank_name||'Conductor Bank')+' · '+(c.label||'Карта')+' · ••'+String(c.card_number||'').slice(-4)+' · '+money(c.balance)})),'Выбери виртуальную карту');
+  if(cards.some(c=>c.id===current))$('payCard').value=current;
+  renderBank();
+ }
+ async function adjustBankBalance(action){
+  const c=selectedCard();if(!c){toast('Сначала выбери карту','error');return}
+  let amount=null;
+  if(action==='empty'){if(!confirm('Обнулить баланс выбранной карты? Операция сохранится в истории.'))return}
+  else{amount=Number(String($('bankAmount').value||'').replace(',','.'));if(!Number.isFinite(amount)||amount<=0){toast('Укажи сумму больше нуля','error');return}}
+  try{
+   const q=await client.rpc('conductor_adjust_virtual_card',{p_card_id:c.id,p_action:action,p_amount:amount,p_note:action==='top_up'?'Пополнение через QR-банк':action==='withdrawal'?'Списание через QR-банк':'Баланс обнулён через QR-банк'});
+   if(q.error)throw q.error;if(!q.data?.ok)throw new Error('Операция не выполнена');
+   cards=cards.map(x=>x.id===c.id?{...x,balance:Number(q.data.balance)}:x);
+   if(q.data.transaction)cardTransactions.unshift(q.data.transaction);
+   $('bankAmount').value='';refillCardSelector(c.id);
+   toast(action==='top_up'?'Карта пополнена':action==='withdrawal'?'Средства списаны':'Баланс обнулён','success');
+  }catch(e){toast('Ошибка виртуального банка: '+e.message,'error')}
+ }
+ async function createBankCard(){
+  const holder=$('newCardHolder').value.trim(),label=$('newCardLabel').value.trim()||'Моя карта',bank=$('newCardBank').value.trim()||'Conductor Bank';
+  const number=$('newCardNumber').value.trim()||randomVirtualCardNumber(),initial=Math.max(0,Number($('newCardInitial').value)||0);
+  if(!holder){toast('Укажи владельца карты','error');return}
+  if(!/^\\d{16}$/.test(number)){toast('Номер должен содержать ровно 16 цифр','error');return}
+  if(cards.some(c=>c.card_number===number)){toast('Такой номер уже занят — придумай другой','error');return}
+  try{
+   const row={id:'card_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),holder,label,bank_name:bank,card_number:number,card_type:$('newCardType').value,card_color:$('newCardColor').value,balance:0};
+   const q=await client.from('conductor_cards').insert(row).select().single();if(q.error)throw q.error;
+   cards.push(q.data);
+   if(initial>0){
+    const top=await client.rpc('conductor_adjust_virtual_card',{p_card_id:q.data.id,p_action:'top_up',p_amount:initial,p_note:'Начальное пополнение при выпуске карты'});
+    if(top.error)throw top.error;
+    cards=cards.map(c=>c.id===q.data.id?{...c,balance:Number(top.data.balance)}:c);
+    if(top.data.transaction)cardTransactions.unshift(top.data.transaction);
+   }
+   refillCardSelector(q.data.id);$('createBankCardPanel').hidden=true;
+   $('newCardHolder').value='';$('newCardLabel').value='Моя карта';$('newCardNumber').value='';$('newCardInitial').value='0';
+   toast('Новая виртуальная карта выпущена','success');
+  }catch(e){toast('Не удалось выпустить карту: '+e.message,'error')}
+ }
+
 function updateStops(){
  route=routes.find(r=>r.id===$('payRoute').value&&!r.archived_at)||null;
  const sameShiftRoute=!!route&&!!shift&&route.id===shift.route_id,oldFrom=$('payFrom').value;
@@ -71,30 +150,31 @@ async function finish(method){
    const result=await client.rpc('conductor_charge_virtual_card',{p_card_id:cardId,p_ticket_rows:rows});
    if(result.error)throw result.error;if(!result.data?.ok)throw new Error('Недостаточно средств на карте');
    tickets=result.data.tickets;
-   const c=await client.from('conductor_cards').select('*').eq('id',cardId).single();if(!c.error)$('payCard').querySelector('option[value="'+CSS.escape(cardId)+'"]').textContent=c.data.holder+' · '+money(c.data.balance);
+   const c=await client.from('conductor_cards').select('*').eq('id',cardId).single();if(!c.error)cards=cards.map(x=>x.id===cardId?c.data:x);
   }else{
    const result=await client.from('conductor_tickets').insert(rows).select('*');if(result.error)throw result.error;tickets=result.data;
   }
-  $('payResult').innerHTML='<div class="pay-success">Оплата прошла успешно · билет № '+tickets[0].ticket_number+'</div>';toast('Оплата прошла успешно','success');$('payCash').disabled=true;$('payByCard').disabled=true;
+  if(method==='card'){try{const h=await client.from('conductor_card_transactions').select('*').eq('card_id',$('payCard').value).order('created_at',{ascending:false}).limit(300);if(!h.error)cardTransactions=cardTransactions.filter(t=>t.card_id!==$('payCard').value).concat(h.data||[]);refillCardSelector($('payCard').value)}catch(e){console.warn('Bank history refresh skipped',e)}}$('payResult').innerHTML='<div class="pay-success">Оплата прошла успешно · билет № '+tickets[0].ticket_number+'</div>';toast('Оплата прошла успешно','success');$('payCash').disabled=true;$('payByCard').disabled=true;
  }catch(e){$('payResult').innerHTML='<div class="pay-fail">'+e.message+'</div>';toast('Оплата не прошла: '+e.message,'error');btn.disabled=false;btn.textContent=method==='cash'?'Наличными':'Оплатить картой'}
 }
 async function init(){
  if(!cashShiftId){$('payStatus').textContent='QR-код без кассовой смены';toast('Неверная ссылка: нет номера кассовой смены','error');return}
  try{
-  const [s,cs,r,c]=await Promise.all([
+  const [s,cs,r,c,t]=await Promise.all([
    client.from('conductor_shifts').select('*').eq('id',shiftId).maybeSingle(),
    client.from('conductor_cash_shifts').select('*').eq('id',cashShiftId).maybeSingle(),
    client.from('conductor_routes').select('*').eq('city','Тверь').is('archived_at',null).order('name'),
-   client.from('conductor_cards').select('*').order('holder')
+   client.from('conductor_cards').select('*').order('holder'),
+   client.from('conductor_card_transactions').select('*').order('created_at',{ascending:false}).limit(300)
   ]);
-  if(s.error)throw s.error;if(cs.error)throw cs.error;if(r.error)throw r.error;if(c.error)throw c.error;
+  if(s.error)throw s.error;if(cs.error)throw cs.error;if(r.error)throw r.error;if(c.error)throw c.error;if(t.error)throw t.error;
   shift=s.data;if(shiftId&&(!shift||shift.status!=='open'))throw new Error('Рейс уже завершён');
   if(!cs.data||cs.data.status!=='open')throw new Error('Кассовая смена уже закрыта. Попроси кассира открыть новую кассу и показать новый QR-код.');
-  routes=(r.data||[]).filter(x=>!x.archived_at);cards=c.data||[];
+  routes=(r.data||[]).filter(x=>!x.archived_at);cards=c.data||[];cardTransactions=t.data||[];
   fill($('payRoute'),routes.map(x=>({value:x.id,label:x.name})),'Выбери маршрут');
   if(routeParam&&routes.some(x=>x.id===routeParam))$('payRoute').value=routeParam;else if(shift?.route_id)$('payRoute').value=shift.route_id;
-  fill($('payCard'),cards.map(x=>({value:x.id,label:x.holder+' · '+money(x.balance)})),'Выбери карту для оплаты');
-  $('payRoute').onchange=()=>{route=null;updateStops()};$('payFrom').onchange=updateStops;$('payTo').onchange=updateTotal;$('payFare').onchange=updateTotal;$('payQty').oninput=updateTotal;
+  refillCardSelector();
+  $('payRoute').onchange=()=>{route=null;updateStops()};$('payFrom').onchange=updateStops;$('payTo').onchange=updateTotal;$('payFare').onchange=updateTotal;$('payQty').oninput=updateTotal;$('payCard').onchange=renderBank;$('payRandomCard').onclick=()=>{const x=updateTotal(),eligible=cards.filter(c=>Number(c.balance)>=Number(x.total||0)),pool=eligible.length?eligible:cards;if(!pool.length){toast('Сначала выпусти виртуальную карту','error');return}$('payCard').value=pool[Math.floor(Math.random()*pool.length)].id;renderBank();toast('Случайная карта выбрана','success')};$('bankTopUp').onclick=()=>adjustBankBalance('top_up');$('bankWithdraw').onclick=()=>adjustBankBalance('withdrawal');$('bankEmpty').onclick=()=>adjustBankBalance('empty');$('toggleCreateCard').onclick=()=>{$('createBankCardPanel').hidden=!$('createBankCardPanel').hidden;if(!$('createBankCardPanel').hidden&&!$('newCardNumber').value)$('newCardNumber').value=randomVirtualCardNumber()};$('newCardNumber').oninput=()=>{$('newCardNumber').value=$('newCardNumber').value.replace(/\\D/g,'').slice(0,16)};$('createBankCard').onclick=createBankCard;
   $('payCash').onclick=()=>finish('cash');$('payByCard').onclick=()=>finish('card');
   if(shift?.route_id&&routes.some(x=>x.id===shift.route_id))$('payRoute').value=shift.route_id;
   updateStops();$('payStatus').textContent='Кассовая смена открыта';$('payStatus').className='shift-badge open';
