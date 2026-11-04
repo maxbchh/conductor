@@ -1,7 +1,7 @@
 (() => {
 'use strict';
-const SUPABASE_URL='https://ubhfigqpsepnpokrbdyo.supabase.co';
-const SUPABASE_KEY='sb_publishable_yN8W8pvQq8hWsYMO8z1Rzw_6zKQ-8D1';
+const SUPABASE_URL='https://yycaxmfljqzfkjukplkz.supabase.co';
+const SUPABASE_KEY='sb_publishable_Ur6yP5_7LQ-9DGmriBJIpw_zIWJiM7T';
 const $=id=>document.getElementById(id);
 const money=n=>Number(n||0).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' BYN';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
