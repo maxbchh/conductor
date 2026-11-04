@@ -391,6 +391,6 @@ function init(){
 document.addEventListener('DOMContentLoaded',async()=>{
  init();
  try{if(!window.supabase)throw new Error('Supabase SDK не загрузился');client=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false}});await loadData();startRealtime()}
- catch(e){console.error('Conductor startup error',e);setCloud('Ошибка запуска','error');toast('Ошибка запуска: '+(e.message||String(e)),'error')}
+ catch(e){console.error('Ошибка запуска Кондуктора',e);setCloud('Ошибка запуска','error');toast('Ошибка запуска: '+(e.message||String(e)),'error')}
 });
 })();
