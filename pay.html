@@ -59,7 +59,7 @@ function toast(s,type=''){const el=$('payToast');el.textContent=s;el.className='
 function fill(el,items,placeholder){el.innerHTML='<option value="">'+placeholder+'</option>';items.forEach(x=>{const o=document.createElement('option');o.value=x.value;o.textContent=x.label;el.appendChild(o)})}
 
  function randomVirtualCardNumber(){return '9900'+Array.from({length:3},()=>String(Math.floor(Math.random()*10000)).padStart(4,'0')).join('')}
- function displayCardNumber(n){return String(n||'').replace(/(\\d{4})(?=\\d)/g,'$1 ')}
+ function displayCardNumber(n){return String(n||'').replace(/(\d{4})(?=\d)/g,'$1 ')}
  function selectedCard(){return cards.find(c=>c.id===$('payCard').value)||null}
  function renderBank(){
   const c=selectedCard(),preview=$('bankCardPreview');
@@ -99,7 +99,7 @@ function fill(el,items,placeholder){el.innerHTML='<option value="">'+placeholder
   const holder=$('newCardHolder').value.trim(),label=$('newCardLabel').value.trim()||'Моя карта',bank=$('newCardBank').value.trim()||'Conductor Bank';
   const number=$('newCardNumber').value.trim()||randomVirtualCardNumber(),initial=Math.max(0,Number($('newCardInitial').value)||0);
   if(!holder){toast('Укажи владельца карты','error');return}
-  if(!/^\\d{16}$/.test(number)){toast('Номер должен содержать ровно 16 цифр','error');return}
+  if(!/^\d{16}$/.test(number)){toast('Номер должен содержать ровно 16 цифр','error');return}
   if(cards.some(c=>c.card_number===number)){toast('Такой номер уже занят — придумай другой','error');return}
   try{
    const row={id:'card_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),holder,label,bank_name:bank,card_number:number,card_type:$('newCardType').value,card_color:$('newCardColor').value,balance:0};
@@ -174,7 +174,7 @@ async function init(){
   fill($('payRoute'),routes.map(x=>({value:x.id,label:x.name})),'Выбери маршрут');
   if(routeParam&&routes.some(x=>x.id===routeParam))$('payRoute').value=routeParam;else if(shift?.route_id)$('payRoute').value=shift.route_id;
   refillCardSelector();
-  $('payRoute').onchange=()=>{route=null;updateStops()};$('payFrom').onchange=updateStops;$('payTo').onchange=updateTotal;$('payFare').onchange=updateTotal;$('payQty').oninput=updateTotal;$('payCard').onchange=renderBank;$('payRandomCard').onclick=()=>{const x=updateTotal(),eligible=cards.filter(c=>Number(c.balance)>=Number(x.total||0)),pool=eligible.length?eligible:cards;if(!pool.length){toast('Сначала выпусти виртуальную карту','error');return}$('payCard').value=pool[Math.floor(Math.random()*pool.length)].id;renderBank();toast('Случайная карта выбрана','success')};$('bankTopUp').onclick=()=>adjustBankBalance('top_up');$('bankWithdraw').onclick=()=>adjustBankBalance('withdrawal');$('bankEmpty').onclick=()=>adjustBankBalance('empty');$('toggleCreateCard').onclick=()=>{$('createBankCardPanel').hidden=!$('createBankCardPanel').hidden;if(!$('createBankCardPanel').hidden&&!$('newCardNumber').value)$('newCardNumber').value=randomVirtualCardNumber()};$('newCardNumber').oninput=()=>{$('newCardNumber').value=$('newCardNumber').value.replace(/\\D/g,'').slice(0,16)};$('createBankCard').onclick=createBankCard;
+  $('payRoute').onchange=()=>{route=null;updateStops()};$('payFrom').onchange=updateStops;$('payTo').onchange=updateTotal;$('payFare').onchange=updateTotal;$('payQty').oninput=updateTotal;$('payCard').onchange=renderBank;$('payRandomCard').onclick=()=>{const x=updateTotal(),eligible=cards.filter(c=>Number(c.balance)>=Number(x.total||0)),pool=eligible.length?eligible:cards;if(!pool.length){toast('Сначала выпусти виртуальную карту','error');return}$('payCard').value=pool[Math.floor(Math.random()*pool.length)].id;renderBank();toast('Случайная карта выбрана','success')};$('bankTopUp').onclick=()=>adjustBankBalance('top_up');$('bankWithdraw').onclick=()=>adjustBankBalance('withdrawal');$('bankEmpty').onclick=()=>adjustBankBalance('empty');$('toggleCreateCard').onclick=()=>{$('createBankCardPanel').hidden=!$('createBankCardPanel').hidden;if(!$('createBankCardPanel').hidden&&!$('newCardNumber').value)$('newCardNumber').value=randomVirtualCardNumber()};$('newCardNumber').oninput=()=>{$('newCardNumber').value=$('newCardNumber').value.replace(/\D/g,'').slice(0,16)};$('createBankCard').onclick=createBankCard;
   $('payCash').onclick=()=>finish('cash');$('payByCard').onclick=()=>finish('card');
   if(shift?.route_id&&routes.some(x=>x.id===shift.route_id))$('payRoute').value=shift.route_id;
   updateStops();$('payStatus').textContent='Кассовая смена открыта';$('payStatus').className='shift-badge open';
