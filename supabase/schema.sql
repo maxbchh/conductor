@@ -75,3 +75,15 @@ create policy "Conductor public access tickets" on public.conductor_tickets for 
 
 grant select, insert, update, delete on public.conductor_routes, public.conductor_vehicles, public.conductor_shifts, public.conductor_tickets to anon, authenticated;
 grant usage, select on sequence public.conductor_tickets_ticket_number_seq to anon, authenticated;
+
+-- Schedules and shift progress
+alter table public.conductor_shifts add column if not exists current_stop_index integer not null default 0;
+alter table public.conductor_shifts add column if not exists end_stop_index integer;
+alter table public.conductor_shifts add column if not exists schedule_mode text not null default 'simple';
+alter table public.conductor_shifts add column if not exists schedule_id text;
+alter table public.conductor_shifts add column if not exists arrival_time text;
+create table if not exists public.conductor_schedules(id text primary key,folder text not null,title text not null,body text not null default '',created_at timestamptz not null default now(),updated_at timestamptz not null default now());
+alter table public.conductor_schedules enable row level security;
+drop policy if exists "Conductor public access schedules" on public.conductor_schedules;
+create policy "Conductor public access schedules" on public.conductor_schedules for all to anon,authenticated using(true) with check(true);
+grant select,insert,update,delete on public.conductor_schedules to anon,authenticated;
