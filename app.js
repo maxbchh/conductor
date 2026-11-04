@@ -114,22 +114,24 @@ function openPayment(){
  $('payCard').onclick=()=>{const id=$('cardForPayment').value;if(!id){toast('Создай или выбери виртуальную карту','error');return}completeSale(x,'card',x.total,id)};
 }
 async function completeSale(x,method,received,cardId){
- const button=method==='cash'?$('payCash'):$('payCard');button.disabled=true;button.textContent='Проверка оплаты…';let chargedCard=null;
+ const button=method==='cash'?$('payCash'):$('payCard');button.disabled=true;button.textContent='Проверка оплаты…';
  try{
-  if(method==='card'){
-   const card=db.cards.find(c=>c.id===cardId);if(!card)throw new Error('Виртуальная карта не найдена');
-   const charge=await client.from('conductor_cards').update({balance:Number((Number(card.balance)-x.total).toFixed(2))}).eq('id',cardId).gte('balance',x.total).select().single();
-   if(charge.error||!charge.data)throw new Error('Недостаточно средств на карте');
-   chargedCard=charge.data;db.cards=db.cards.map(c=>c.id===cardId?charge.data:c);
-  }
   const fareName=x.mult===.5?'Льготный':x.mult===.75?'Школьный':'Полный';
   const rows=Array.from({length:x.qty},()=>({shift_id:currentShift.id,route_id:x.r.id,route_name:x.r.name,from_stop:x.r.stops[x.a],to_stop:x.r.stops[x.b],stop_count:x.stops,fare_type:fareName,fare_multiplier:x.mult,fare_per_stop:x.per,amount:Number((x.stops*x.per*x.mult).toFixed(2)),payment_method:method,cash_received:method==='cash'?received/x.qty:x.total/x.qty,change_due:method==='cash'?Math.max(0,received-x.total)/x.qty:0,game_time:currentShift.game_time,card_id:cardId}));
-  const q=await client.from('conductor_tickets').insert(rows).select('*');if(q.error)throw q.error;
-  db.tickets.push(...q.data);renderTicket(q.data[0]);closeModal();renderStats();renderTickets();renderCards();toast(method==='card'?'Оплата картой прошла · билет № '+q.data[0].ticket_number:'Оплата принята · билет № '+q.data[0].ticket_number,'success');
- }catch(e){
-  if(chargedCard){const refund=await client.from('conductor_cards').update({balance:Number((Number(chargedCard.balance)+x.total).toFixed(2))}).eq('id',cardId).select().single();if(!refund.error)db.cards=db.cards.map(c=>c.id===cardId?refund.data:c)}
-  button.disabled=false;button.textContent=method==='cash'?'Наличными':'Оплатить картой';renderCards();toast('Оплата не прошла: '+e.message,'error');
- }
+  let data;
+  if(method==='card'){
+   const charge=await client.rpc('conductor_charge_virtual_card',{p_card_id:cardId,p_ticket_rows:rows});
+   if(charge.error)throw charge.error;
+   if(!charge.data?.ok)throw new Error('Недостаточно средств на виртуальной карте');
+   data=charge.data.tickets;
+   const refreshed=await client.from('conductor_cards').select('*').eq('id',cardId).single();
+   if(!refreshed.error)db.cards=db.cards.map(c=>c.id===cardId?refreshed.data:c);
+  }else{
+   const q=await client.from('conductor_tickets').insert(rows).select('*');if(q.error)throw q.error;data=q.data;
+  }
+  db.tickets.push(...data);renderTicket(data[0]);closeModal();renderStats();renderTickets();renderCards();
+  toast(method==='card'?'Оплата прошла · билет № '+data[0].ticket_number:'Оплата принята · билет № '+data[0].ticket_number,'success');
+ }catch(e){console.error(e);button.disabled=false;button.textContent=method==='cash'?'Наличными':'Оплатить картой';toast('Оплата не прошла: '+(e.message||'ошибка базы'),'error')}
 }
 function openVehicleEditor(v){
  const edit=!!v;
