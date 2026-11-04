@@ -23,7 +23,7 @@
 <main>
 <section id="view-cash" class="view active">
  <div class="page-heading"><div><p class="eyebrow">РАБОЧЕЕ МЕСТО</p><h1>Касса</h1><p class="muted">Продажа билетов по выбранному маршруту</p></div><div class="context-chip" id="cashContext">Смена не открыта</div></div>
- <div class="glass panel cash-shift-panel"><div class="panel-head"><div><p class="eyebrow">КАССОВАЯ СМЕНА</p><h2 id="cashShiftStatus">Кассовая смена закрыта</h2></div><span class="step-pill">ОТДЕЛЬНО</span></div><div class="field-grid"><label class="field"><span>Размен при открытии (BYN)</span><input id="cashOpening" type="number" min="0" step=".01" value="0"></label><label class="field"><span>Остаток при закрытии (BYN)</span><input id="cashClosing" type="number" min="0" step=".01" value="0"></label></div><div class="trip-actions"><button id="openCashShift" class="primary-btn" type="button">Открыть кассовую смену</button><button id="closeCashShift" class="danger-btn" type="button" disabled>Закрыть кассовую смену</button></div></div>
+
  <div class="cash-layout">
   <div class="glass panel sale-panel">
    <div class="panel-head"><div><p class="eyebrow">НОВАЯ ПРОДАЖА</p><h2>Параметры билета</h2></div><span class="step-pill">01 / 03</span></div>
@@ -44,6 +44,8 @@
   </aside>
  </div>
  <div class="glass panel preview-panel"><div class="preview-heading"><div><p class="eyebrow">ПЕЧАТЬ</p><h2>Мини-билет</h2><p class="muted">Компактный формат для термопринтера 58 мм</p></div><button id="showPhoneQr" class="secondary-btn" type="button">QR для телефона</button><button id="printTicket" class="secondary-btn" type="button">Печать последнего</button></div><div class="ticket-stage"><div id="ticketPreview" class="ticket-paper"><b>БИЛЕТ № —</b><span>От: —</span><span>До: —</span><strong>— BYN</strong></div></div></div>
+
+ <div class="glass panel cash-shift-panel"><div class="panel-head"><div><p class="eyebrow">КАССОВАЯ СМЕНА</p><h2 id="cashShiftStatus">Кассовая смена закрыта</h2></div><span class="step-pill">ОТДЕЛЬНО</span></div><div class="field-grid"><label class="field"><span>Размен при открытии (BYN)</span><input id="cashOpening" type="number" min="0" step=".01" value="0"></label><label class="field"><span>Остаток при закрытии (BYN)</span><input id="cashClosing" type="number" min="0" step=".01" value="0"></label></div><div class="trip-actions"><button id="openCashShift" class="primary-btn" type="button">Открыть кассовую смену</button><button id="closeCashShift" class="danger-btn" type="button" disabled>Закрыть кассовую смену</button></div></div>
 </section>
 <section id="view-trips" class="view">
  <div class="page-heading"><div><p class="eyebrow">УПРАВЛЕНИЕ СМЕНОЙ</p><h1>Рейсы</h1><p class="muted">Назначение подвижного состава и игрового времени</p></div></div>
