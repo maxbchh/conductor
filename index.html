@@ -18,7 +18,7 @@
 <nav class="tabs glass">
  <button class="tab active" data-tab="cash"><span>▦</span> Касса</button>
  <button class="tab" data-tab="trips"><span>↗</span> Рейсы</button>
- <button class="tab" data-tab="database"><span>▤</span> База данных</button><button class="tab" data-tab="schedules"><span>▤</span> Расписание</button>
+ <button class="tab" data-tab="database"><span>▤</span> База данных</button><button class="tab" data-tab="schedules"><span>▤</span> Расписание</button><button class="tab" data-tab="news"><span>▣</span> Новости</button>
 </nav>
 <main>
 <section id="view-cash" class="view active">
@@ -61,6 +61,7 @@
  <div class="glass panel"><div class="panel-head"><div><p class="eyebrow">ИСТОРИЯ</p><h2>Последние рейсы</h2></div></div><div id="shiftHistory" class="empty-state">Рейсов пока нет</div></div>
 </section>
 <section id="view-schedules" class="view"><div class="page-heading"><div><p class="eyebrow">АРХИВ ДВИЖЕНИЯ</p><h1>Расписание</h1><p class="muted">Папки маршрутов и текстовые расписания города Твери</p></div><button id="addScheduleFolder" class="primary-btn compact" type="button">＋ Новая папка</button></div><div id="scheduleFolders" class="schedule-folders"></div><div id="scheduleEntries" class="glass panel"><div class="empty-state">Выбери папку маршрута</div></div></section>
+<section id="view-news" class="view"><div class="page-heading"><div><p class="eyebrow">ГОРОДСКАЯ ЛЕНТА</p><h1>Городские новости</h1><p class="muted">Новости и объявления города Твери</p></div><button id="addNews" class="primary-btn compact" type="button">＋ Добавить новость</button></div><div id="newsList" class="news-list"></div></section>
 <section id="view-database" class="view">
  <div class="page-heading"><div><p class="eyebrow">СПРАВОЧНИКИ</p><h1>База данных</h1><p class="muted">Подвижной состав, маршруты и история билетов</p></div></div>
  <div class="db-tabs"><button class="db-tab active" data-dbtab="fleet">Автобусный парк</button><button class="db-tab" data-dbtab="routes">Маршруты</button><button class="db-tab" data-dbtab="tickets">Билеты</button><button class="db-tab" data-dbtab="cards">Виртуальные карты</button></div>
@@ -68,6 +69,7 @@
  <div id="db-routes" class="db-view glass panel"><div class="panel-head"><div><p class="eyebrow">МАРШРУТНАЯ СЕТЬ</p><h2>Редактор маршрутов</h2></div><button id="addRoute" class="primary-btn compact">＋ Маршрут</button></div><div class="db-toolbar"><label class="field"><span>Город</span><select id="routesCity"><option>Тверь</option></select></label></div><div id="routesList" class="table-wrap"></div></div>
  <div id="db-cards" class="db-view glass panel"><div class="panel-head"><div><p class="eyebrow">ИГРОВАЯ ПЛАТЁЖНАЯ СИСТЕМА</p><h2>Виртуальные карты</h2></div><button id="addCard" class="primary-btn compact" type="button">＋ Создать карту</button></div><div id="cardsList" class="table-wrap"></div></div>
 <div id="db-tickets" class="db-view glass panel"><div class="panel-head"><div><p class="eyebrow">ИСТОРИЯ ПРОДАЖ</p><h2>База билетов</h2></div><span class="step-pill" id="ticketCount">0 билетов</span></div><div id="ticketsList" class="table-wrap"></div></div>
+ <div class="glass panel"><div class="panel-head"><div><p class="eyebrow">ВОССТАНОВЛЕНИЕ</p><h2>Архив удалённых записей</h2></div></div><div id="archiveList"></div></div>
 </section>
 </main>
 <div id="modalLayer" class="modal-layer" aria-hidden="true"><div class="modal glass"><button id="modalClose" class="modal-close" type="button">×</button><div id="modalContent"></div></div></div>
