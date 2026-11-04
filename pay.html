@@ -39,23 +39,35 @@ const money=n=>Number(n||0).toLocaleString('ru-RU',{minimumFractionDigits:2,maxi
 function toast(s,type=''){const el=$('payToast');el.textContent=s;el.className='toast show '+type;setTimeout(()=>el.classList.remove('show'),3500)}
 function fill(el,items,placeholder){el.innerHTML='<option value="">'+placeholder+'</option>';items.forEach(x=>{const o=document.createElement('option');o.value=x.value;o.textContent=x.label;el.appendChild(o)})}
 function updateStops(){
- route=routes.find(r=>r.id===$('payRoute').value)||null;
- const start=route?Math.max(0,Math.min(Number(shift.current_stop_index||0),route.stops.length-1)):0;const end=shift.end_stop_index==null?(route?.stops.length||1)-1:Number(shift.end_stop_index);
- fill($('payFrom'),(route?.stops||[]).map((s,i)=>({value:String(i),label:s})),'—');fill($('payTo'),(route?.stops||[]).map((s,i)=>({value:String(i),label:s})).filter(x=>Number(x.value)>start&&Number(x.value)<=end),'Выбери остановку');
- if(route){$('payFrom').value=String(start);$('payFrom').disabled=true}
+ route=routes.find(r=>r.id===$('payRoute').value&&!r.archived_at)||null;
+ const sameShiftRoute=!!route&&route.id===shift.route_id;
+ const start=route?(sameShiftRoute?Math.max(0,Math.min(Number(shift.current_stop_index||0),route.stops.length-1)):0):0;
+ const end=route?(sameShiftRoute?Math.max(start,Math.min(Number(shift.end_stop_index??route.stops.length-1),route.stops.length-1)):route.stops.length-1):0;
+ fill($('payFrom'),(route?.stops||[]).map((s,i)=>({value:String(i),label:s})),'—');
+ fill($('payTo'),(route?.stops||[]).map((s,i)=>({value:String(i),label:s})).filter(x=>Number(x.value)>start&&Number(x.value)<=end),'Выбери остановку');
+ if(route){$('payFrom').value=String(start);$('payFrom').disabled=true}else $('payFrom').disabled=true;
  updateTotal();
 }
 function updateTotal(){
- const r=routes.find(x=>x.id===$('payRoute').value),a=Number($('payFrom').value),b=Number($('payTo').value),valid=!!r&&Number.isInteger(a)&&Number.isInteger(b)&&b>a;
+ const r=routes.find(x=>x.id===$('payRoute').value&&!x.archived_at),a=Number($('payFrom').value),b=Number($('payTo').value);
+ const sameShiftRoute=!!r&&r.id===shift.route_id,start=r?(sameShiftRoute?Math.max(0,Math.min(Number(shift.current_stop_index||0),r.stops.length-1)):0):0;
+ const end=r?(sameShiftRoute?Math.max(start,Math.min(Number(shift.end_stop_index??r.stops.length-1),r.stops.length-1)):r.stops.length-1):-1;
+ const valid=!!r&&Number.isInteger(a)&&Number.isInteger(b)&&a===start&&b>a&&b<=end;
  const count=valid?b-a:0,qty=Math.max(1,Math.min(20,Number($('payQty').value)||1)),mult=Number($('payFare').value||1),per=Number(r?.fare_per_stop||0),total=count*qty*mult*per;
  $('payStops').textContent=valid?count:'—';$('payPer').textContent=r?money(per):'—';$('payTotal').textContent=money(total);
  return {r,a,b,count,qty,mult,per,total,valid};
 }
 async function finish(method){
- const x=updateTotal();if(!shift||shift.status!=='open'){toast('Смена уже закрыта','error');return}
- if(!x.valid){toast('Выбери маршрут и остановку назначения','error');return}
+ const x=updateTotal();if(!shift||shift.status!=='open'){toast('Водительская смена уже закрыта','error');return}
+ if(!x.valid){toast('Выбери активный маршрут и допустимую остановку назначения','error');return}
  const btn=method==='cash'?$('payCash'):$('payByCard');btn.disabled=true;btn.textContent='Проверка…';
  try{
+  const [freshDriver,freshCash]=await Promise.all([
+   client.from('conductor_shifts').select('id,status').eq('id',shiftId).maybeSingle(),
+   client.from('conductor_cash_shifts').select('id,status').eq('id',cashShiftId).maybeSingle()
+  ]);
+  if(freshDriver.error)throw freshDriver.error;if(freshCash.error)throw freshCash.error;
+  if(freshDriver.data?.status!=='open'||freshCash.data?.status!=='open')throw new Error('Одна из смен уже закрыта. Обнови QR-код у кассира.');
   const fare=x.mult===.5?'Льготный':x.mult===.75?'Школьный':'Полный';
   const rows=Array.from({length:x.qty},()=>({shift_id:shift.id,cash_shift_id:cashShiftId,route_id:x.r.id,route_name:x.r.name,from_stop:x.r.stops[x.a],to_stop:x.r.stops[x.b],stop_count:x.count,fare_type:fare,fare_multiplier:x.mult,fare_per_stop:x.per,amount:Number((x.count*x.per*x.mult).toFixed(2)),payment_method:method,cash_received:method==='cash'?Number((x.total/x.qty).toFixed(2)):Number((x.total/x.qty).toFixed(2)),change_due:0,game_time:shift.game_time}));
   let tickets;
@@ -74,16 +86,23 @@ async function finish(method){
 async function init(){
  if(!shiftId||!cashShiftId){$('payStatus').textContent='QR-код без номера смены';toast('Неверная ссылка','error');return}
  try{
-  const [s,r,c]=await Promise.all([client.from('conductor_shifts').select('*').eq('id',shiftId).single(),client.from('conductor_routes').select('*').eq('city','Тверь').order('name'),client.from('conductor_cards').select('*').order('holder')]);
-  if(s.error)throw s.error;if(r.error)throw r.error;if(c.error)throw c.error;
-  shift=s.data;if(shift.status!=='open')throw new Error('Эта смена уже закрыта');
-  routes=r.data||[];cards=c.data||[];
+  const [s,cs,r,c]=await Promise.all([
+   client.from('conductor_shifts').select('*').eq('id',shiftId).maybeSingle(),
+   client.from('conductor_cash_shifts').select('*').eq('id',cashShiftId).maybeSingle(),
+   client.from('conductor_routes').select('*').eq('city','Тверь').is('archived_at',null).order('name'),
+   client.from('conductor_cards').select('*').order('holder')
+  ]);
+  if(s.error)throw s.error;if(cs.error)throw cs.error;if(r.error)throw r.error;if(c.error)throw c.error;
+  shift=s.data;if(!shift||shift.status!=='open')throw new Error('Водительская смена уже закрыта');
+  if(!cs.data||cs.data.status!=='open')throw new Error('Кассовая смена уже закрыта. Попроси кассира открыть новую кассу и показать новый QR-код.');
+  routes=(r.data||[]).filter(x=>!x.archived_at);cards=c.data||[];
   fill($('payRoute'),routes.map(x=>({value:x.id,label:x.name})),'Выбери маршрут');
   if(routeParam&&routes.some(x=>x.id===routeParam))$('payRoute').value=routeParam;else if(shift.route_id)$('payRoute').value=shift.route_id;
   fill($('payCard'),cards.map(x=>({value:x.id,label:x.holder+' · '+money(x.balance)})),'Выбери карту для оплаты');
-  $('payRoute').onchange=async()=>{updateStops();const id=$('payRoute').value;if(id&&shift.route_id!==id){const upd=await client.from('conductor_shifts').update({route_id:id,end_stop_index:routes.find(r=>r.id===id).stops.length-1}).eq('id',shift.id).select().single();if(!upd.error)shift=upd.data}};$('payTo').onchange=updateTotal;$('payFare').onchange=updateTotal;$('payQty').oninput=updateTotal;
+  $('payRoute').onchange=updateStops;$('payTo').onchange=updateTotal;$('payFare').onchange=updateTotal;$('payQty').oninput=updateTotal;
   $('payCash').onclick=()=>finish('cash');$('payByCard').onclick=()=>finish('card');
-  updateStops();if($('payRoute').value&&shift.route_id!==$('payRoute').value){const route=routes.find(x=>x.id===$('payRoute').value);const assigned=await client.from('conductor_shifts').update({route_id:route.id,end_stop_index:shift.end_stop_index==null?route.stops.length-1:shift.end_stop_index}).eq('id',shift.id).select().single();if(!assigned.error)shift=assigned.data} $('payStatus').textContent='Смена открыта';$('payStatus').className='shift-badge open';
+  if(shift.route_id&&routes.some(x=>x.id===shift.route_id))$('payRoute').value=shift.route_id;
+  updateStops();$('payStatus').textContent='Обе смены открыты';$('payStatus').className='shift-badge open';
  }catch(e){$('payStatus').textContent='Нет активной смены';toast(e.message,'error')}
 }
 init();
