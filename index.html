@@ -15,18 +15,11 @@
  <div class="clock-group"><div><small>ОБЫЧНОЕ ВРЕМЯ</small><b id="realClock">--:--:--</b></div><i></i><div><small>ИГРОВОЕ ВРЕМЯ</small><b id="gameClock">--:--:--</b><small id="gameDate" class="game-clock-date">--.--.----</small></div></div>
  <div class="top-actions"><span id="cloudState" class="cloud-state"><i></i> Подключение…</span><span id="shiftBadge" class="shift-badge closed">Смена закрыта</span></div>
 </header>
-<section class="game-clock-panel glass" aria-label="Управление игровым временем">
- <div class="game-clock-status"><span id="gameClockDot" class="game-clock-dot"></span><div><small>УПРАВЛЕНИЕ ИГРОВЫМ ВРЕМЕНЕМ</small><b id="gameClockStatus">Подключение часов…</b></div></div>
- <div class="game-clock-actions">
-  <button id="gameClockPause" class="secondary-btn compact" type="button" disabled>Ⅱ Пауза</button>
-  <label class="game-clock-rate"><span>Скорость</span><select id="gameClockRate" disabled><option value="0.25">0,25×</option><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select></label>
-  <div class="game-clock-jumps"><button id="gameClockBackHour" class="secondary-btn compact" type="button" disabled>−1 ч</button><button id="gameClockBack15" class="secondary-btn compact" type="button" disabled>−15 мин</button><button id="gameClockForward15" class="secondary-btn compact" type="button" disabled>+15 мин</button><button id="gameClockForwardHour" class="secondary-btn compact" type="button" disabled>+1 ч</button></div>
- </div>
- <div class="game-clock-manual"><label><span>Установить дату и время вручную</span><input id="gameClockManual" type="datetime-local" step="1" disabled></label><button id="gameClockSet" class="primary-btn compact" type="button" disabled>Установить</button></div>
-</section>
+
 <nav class="tabs glass">
  <button class="tab active" data-tab="cash"><span>▦</span> Касса</button>
  <button class="tab" data-tab="trips"><span>↗</span> Рейсы</button>
+ <button class="tab" data-tab="gameclock"><span>◷</span> Игровое время</button>
  <button class="tab" data-tab="database"><span>▤</span> База данных</button><button class="tab" data-tab="schedules"><span>▤</span> Расписание</button><button class="tab" data-tab="news"><span>▣</span> Новости</button>
 </nav>
 <main>
@@ -63,13 +56,25 @@
    <label class="field"><span>Город / парк</span><select id="tripCity"><option>Тверь</option></select></label>
    
    <label class="field"><span>Подвижной состав</span><select id="tripVehicle"></select></label>
-   <label class="field"><span>Время при открытии рейса</span><input id="tripGameTime" type="time" value="08:00" readonly></label><label class="field full"><span>Автобус вручную (если его нет в базе)</span><input id="tripManualVehicle" placeholder="Например: МАЗ 103 · борт 102"></label>
+   <input id="tripGameTime" type="hidden" value="08:00"><label class="field full"><span>Автобус вручную (если его нет в базе)</span><input id="tripManualVehicle" placeholder="Например: МАЗ 103 · борт 102"></label>
   </div>
   <div class="trip-actions"><button id="startShift" class="primary-btn" type="button">Открыть рейс →</button><button id="tripNextStop" class="secondary-btn" type="button" disabled>Следующая остановка →</button><button id="endShift" class="danger-btn" type="button" disabled>Завершить рейс</button></div>
   <div id="liveRouteControls" class="field-grid"><label class="field"><span>Маршрут текущего рейса</span><select id="liveRoute"></select></label><label class="field"><span>Текущая остановка</span><select id="liveCurrentStop"></select></label><label class="field"><span>Конец рейса (любая остановка)</span><select id="liveEndStop"></select></label><div id="liveRouteSummary" class="route-summary">Выбери маршрут — появятся начальная и конечная остановки</div></div><p class="hint">Рейс управляет подвижным составом и текущей остановкой. Для продажи билетов достаточно открытой кассовой смены.</p>
  </div>
  <div class="glass panel trip-route-editor"><div class="panel-head"><div><p class="eyebrow">МАРШРУТНАЯ СЕТЬ</p><h2>Редактор рейсов</h2><p class="muted">Создавай маршруты и добавляй остановки по порядку</p></div><button id="tripAddRoute" class="primary-btn compact" type="button">＋ Создать маршрут</button></div><div id="tripRoutesList" class="table-wrap"><div class="empty-state">Маршрутов пока нет. Создай первый маршрут.</div></div></div>
  <div class="glass panel"><div class="panel-head"><div><p class="eyebrow">ИСТОРИЯ</p><h2>Последние рейсы</h2></div></div><div id="shiftHistory" class="empty-state">Рейсов пока нет</div></div>
+</section>
+<section id="view-gameclock" class="view">
+ <div class="page-heading"><div><p class="eyebrow">СИМУЛЯЦИЯ ВРЕМЕНИ</p><h1>Игровое время</h1><p class="muted">Управление временем мира — как в OMSI 2</p></div><span class="context-chip">Общее для всех устройств</span></div>
+ <div class="game-clock-workspace">
+  <section class="game-clock-hero glass">
+   <div class="game-clock-hero-top"><span class="game-clock-live"><i id="gameClockDot" class="game-clock-dot"></i><span id="gameClockStatus">Подключение часов…</span></span><span class="game-clock-world">CONDUCTOR WORLD CLOCK</span></div>
+   <div class="game-clock-digital"><span id="gameClockLarge">08:00:00</span><small id="gameClockLargeDate">Дата загружается…</small></div>
+   <div class="game-clock-main-actions"><button id="gameClockPause" class="primary-btn" type="button" disabled>Ⅱ Остановить время</button><label class="game-clock-rate"><span>Скорость игрового времени</span><select id="gameClockRate" disabled><option value="0.25">0,25× · очень медленно</option><option value="0.5">0,5× · медленно</option><option value="1" selected>1× · обычная</option><option value="2">2× · быстро</option><option value="4">4× · ускоренно</option><option value="8">8× · очень быстро</option><option value="16">16× · перемотка</option></select></label></div>
+  </section>
+  <section class="glass panel game-clock-tools"><div class="panel-head"><div><p class="eyebrow">БЫСТРОЕ УПРАВЛЕНИЕ</p><h2>Перемотка времени</h2><p class="muted">Сдвигай игровое время вперёд или назад</p></div></div><div class="game-clock-jumps"><button id="gameClockBackHour" class="secondary-btn" type="button" disabled>− 1 час</button><button id="gameClockBack15" class="secondary-btn" type="button" disabled>− 15 минут</button><button id="gameClockForward15" class="secondary-btn" type="button" disabled>+ 15 минут</button><button id="gameClockForwardHour" class="secondary-btn" type="button" disabled>+ 1 час</button></div></section>
+  <section class="glass panel game-clock-tools"><div class="panel-head"><div><p class="eyebrow">РУЧНАЯ НАСТРОЙКА</p><h2>Установить дату и время</h2><p class="muted">Можно задать любую дату и точное время вручную</p></div></div><div class="game-clock-manual"><label><span>Дата и время</span><input id="gameClockManual" type="datetime-local" step="1" disabled></label><button id="gameClockSet" class="primary-btn compact" type="button" disabled>Применить время</button></div></section>
+ </div>
 </section>
 <section id="view-schedules" class="view"><div class="page-heading"><div><p class="eyebrow">АРХИВ ДВИЖЕНИЯ</p><h1>Расписание</h1><p class="muted">Папки маршрутов и текстовые расписания города Твери</p></div><button id="addScheduleFolder" class="primary-btn compact" type="button">＋ Новая папка</button></div><div id="scheduleFolders" class="schedule-folders"></div><div id="scheduleEntries" class="glass panel"><div class="empty-state">Выбери папку маршрута</div></div></section>
 <section id="view-news" class="view"><div class="page-heading"><div><p class="eyebrow">ГОРОДСКАЯ ЛЕНТА</p><h1>Городские новости</h1><p class="muted">Новости и объявления города Твери</p></div><button id="addNews" class="primary-btn compact" type="button">＋ Добавить новость</button></div><div id="newsList" class="news-list"></div></section>
