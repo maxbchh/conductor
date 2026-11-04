@@ -11,3 +11,20 @@ select option{background:#f5f8ff;color:#1c2a40}
 .ticket-qr{display:flex;justify-content:center;align-items:center;margin:3px auto 0;min-height:0}.ticket-qr img,.ticket-qr canvas{display:block;width:64px!important;height:64px!important;image-rendering:pixelated}.ticket-paper .ticket-qr img,.ticket-paper .ticket-qr canvas{width:54px!important;height:54px!important}
 
 .trip-route-editor{max-width:1000px}.trip-route-editor .panel-head{align-items:center}.trip-route-editor .muted{margin-top:5px}.trip-route-editor .table-action{white-space:nowrap}
+
+/* Conductor mobile QR checkout and virtual payment cards */
+.toast{top:16px;right:16px;bottom:auto;left:auto;max-width:min(420px,calc(100vw - 32px));z-index:10000}
+.toast.success{background:rgba(19,145,86,.97);color:#fff;border-color:#35c98b}
+.toast.error{background:rgba(190,45,57,.97);color:#fff;border-color:#ff7b86}
+.phone-qr{display:flex;justify-content:center;align-items:center;padding:18px;margin:12px auto;background:#fff;border-radius:18px;width:max-content;max-width:100%;box-shadow:0 10px 30px #1e35521a}
+.phone-qr img,.phone-qr canvas{display:block;max-width:100%;height:auto}
+.card-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;border:1px solid #e3ebf7;border-radius:15px;margin:8px 0;background:rgba(255,255,255,.65)}
+.card-balance{font-weight:800;color:#286fbd;margin-top:5px}
+.phone-pay-main{max-width:780px;margin:28px auto;padding:0 18px}
+.phone-pay-panel{padding:24px}
+.phone-pay-foot{text-align:center;margin:18px}
+.pay-result{margin-top:14px}
+.pay-success,.pay-fail{padding:14px 16px;border-radius:14px;font-weight:700}
+.pay-success{background:#e3f8ed;color:#137c4b;border:1px solid #a7e4c2}
+.pay-fail{background:#fff0f0;color:#a92e3a;border:1px solid #f1b6bc}
+@media(max-width:560px){.phone-pay-panel{padding:17px}.phone-pay-main{margin:18px auto}}
