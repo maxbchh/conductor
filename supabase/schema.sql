@@ -75,34 +75,3 @@ create policy "Conductor public access tickets" on public.conductor_tickets for 
 
 grant select, insert, update, delete on public.conductor_routes, public.conductor_vehicles, public.conductor_shifts, public.conductor_tickets to anon, authenticated;
 grant usage, select on sequence public.conductor_tickets_ticket_number_seq to anon, authenticated;
-
--- One-time, non-destructive import of the existing Ticket route and bus data.
--- Existing Ticket tables and records are not modified.
-insert into public.conductor_routes (id,name,city,stops,fare_per_stop)
-select
-  coalesce(nullif(x->>'id',''), 'legacy_route_' || md5(x::text)),
-  coalesce(nullif(trim(x->>'name'),''), nullif(trim(x->>'route'),''), 'Без названия'),
-  case when lower(coalesce(x->>'city','Тверь')) in ('новоозёрск','новоозерск') then 'Новоозёрск' else 'Тверь' end,
-  case when jsonb_typeof(x->'stops')='array' then x->'stops' else '[]'::jsonb end,
-  greatest(0,coalesce(nullif(x->>'farePerStop','')::numeric,nullif(x->>'fare_per_stop','')::numeric,0.50))
-from public.ticket_shared_state s
-cross join lateral jsonb_array_elements(coalesce(s.data->'routes','[]'::jsonb)) x
-where s.id='main'
-  and coalesce(x->>'transport',x->>'transportType',x->>'type','bus')='bus'
-  and not coalesce((s.data->'deletedRouteIds') ? (x->>'id'),false)
-on conflict (id) do nothing;
-
-insert into public.conductor_vehicles (id,number,model,city,status,build_date,routes,note)
-select
-  coalesce(nullif(x->>'id',''), 'legacy_vehicle_' || md5(x::text)),
-  coalesce(nullif(x->>'number',''), nullif(x->>'model',''), 'Без номера'),
-  coalesce(nullif(x->>'model',''), nullif(x->>'number',''), 'Не указана'),
-  case when lower(coalesce(x->>'city','Тверь')) in ('новоозёрск','новоозерск') then 'Новоозёрск' else 'Тверь' end,
-  case when x->>'status'='На рейсе' then 'В эксплуатации' else coalesce(nullif(x->>'status',''),'В эксплуатации') end,
-  nullif(x->>'buildDate','')::date,
-  case when jsonb_typeof(x->'routes')='array' then x->'routes' else '[]'::jsonb end,
-  coalesce(x->>'note','')
-from public.ticket_shared_state s
-cross join lateral jsonb_array_elements(coalesce(s.data->'busDatabase'->'vehicles','[]'::jsonb)) x
-where s.id='main'
-on conflict (id) do nothing;
