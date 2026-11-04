@@ -25,9 +25,11 @@ function renderGameClock(){
  const ms=getGameClockMs(),d=new Date(ms),clock=$('gameClock'),date=$('gameDate'),paused=!!gameClockState?.is_paused,rate=Number(gameClockState?.rate||1);
  if(clock)clock.textContent=gameClockState?d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'--:--:--';
  if(date)date.textContent=gameClockState?d.toLocaleDateString('ru-RU',{day:'2-digit',month:'long',year:'numeric'}):'--.--.----';
+ if($('gameClockLarge'))$('gameClockLarge').textContent=gameClockState?d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'--:--:--';
+ if($('gameClockLargeDate'))$('gameClockLargeDate').textContent=gameClockState?d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Дата не загружена';
  if($('gameClockStatus'))$('gameClockStatus').textContent=!gameClockState?'Часы не загружены':paused?'Игровое время остановлено':'Игровое время идёт · '+rate+'×';
  if($('gameClockDot'))$('gameClockDot').classList.toggle('paused',paused);
- if($('gameClockPause'))$('gameClockPause').textContent=paused?'▶ Продолжить':'Ⅱ Пауза';
+ if($('gameClockPause'))$('gameClockPause').textContent=paused?'▶ Продолжить время':'Ⅱ Остановить время';
  if($('gameClockRate')&&document.activeElement!==$('gameClockRate'))$('gameClockRate').value=String(rate);
  if($('gameClockManual')&&$('gameClockManual').dataset.touched!=='1'&&gameClockState)$('gameClockManual').value=gameClockInputValue(ms);
  const ids=['gameClockPause','gameClockRate','gameClockBackHour','gameClockBack15','gameClockForward15','gameClockForwardHour','gameClockManual','gameClockSet'];
