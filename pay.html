@@ -40,8 +40,8 @@ function toast(s,type=''){const el=$('payToast');el.textContent=s;el.className='
 function fill(el,items,placeholder){el.innerHTML='<option value="">'+placeholder+'</option>';items.forEach(x=>{const o=document.createElement('option');o.value=x.value;o.textContent=x.label;el.appendChild(o)})}
 function updateStops(){
  route=routes.find(r=>r.id===$('payRoute').value)||null;
- const start=route?Math.max(0,Math.min(Number(shift.current_stop_index||0),route.stops.length-1)):0;
- fill($('payFrom'),(route?.stops||[]).map((s,i)=>({value:String(i),label:s})),'—');fill($('payTo'),(route?.stops||[]).map((s,i)=>({value:String(i),label:s})).filter(x=>Number(x.value)>start),'Выбери остановку');
+ const start=route?Math.max(0,Math.min(Number(shift.current_stop_index||0),route.stops.length-1)):0;const end=shift.end_stop_index==null?(route?.stops.length||1)-1:Number(shift.end_stop_index);
+ fill($('payFrom'),(route?.stops||[]).map((s,i)=>({value:String(i),label:s})),'—');fill($('payTo'),(route?.stops||[]).map((s,i)=>({value:String(i),label:s})).filter(x=>Number(x.value)>start&&Number(x.value)<=end),'Выбери остановку');
  if(route){$('payFrom').value=String(start);$('payFrom').disabled=true}
  updateTotal();
 }
@@ -81,7 +81,7 @@ async function init(){
   fill($('payRoute'),routes.map(x=>({value:x.id,label:x.name})),'Выбери маршрут');
   if(routeParam&&routes.some(x=>x.id===routeParam))$('payRoute').value=routeParam;else if(shift.route_id)$('payRoute').value=shift.route_id;
   fill($('payCard'),cards.map(x=>({value:x.id,label:x.holder+' · '+money(x.balance)})),'Выбери карту для оплаты');
-  $('payRoute').onchange=updateStops;$('payTo').onchange=updateTotal;$('payFare').onchange=updateTotal;$('payQty').oninput=updateTotal;
+  $('payRoute').onchange=async()=>{updateStops();const id=$('payRoute').value;if(id&&shift.route_id!==id){const upd=await client.from('conductor_shifts').update({route_id:id,end_stop_index:routes.find(r=>r.id===id).stops.length-1}).eq('id',shift.id).select().single();if(!upd.error)shift=upd.data}};$('payTo').onchange=updateTotal;$('payFare').onchange=updateTotal;$('payQty').oninput=updateTotal;
   $('payCash').onclick=()=>finish('cash');$('payByCard').onclick=()=>finish('card');
   updateStops();$('payStatus').textContent='Смена открыта';$('payStatus').className='shift-badge open';
  }catch(e){$('payStatus').textContent='Нет активной смены';toast(e.message,'error')}
