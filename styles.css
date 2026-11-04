@@ -248,3 +248,10 @@ main{min-width:0}
 .pay-result{margin-top:12px}
 @media(max-width:680px){.bank-select-row{grid-template-columns:1fr}.bank-select-row .secondary-btn{width:100%}.bank-actions{grid-template-columns:1fr 1fr}.bank-actions .field{grid-column:1/-1}.virtual-card-row{grid-template-columns:1fr}.virtual-card-face{max-width:100%}}
 @media(max-width:420px){.virtual-bank-panel{padding:13px}.virtual-bank-heading{align-items:flex-start;flex-direction:column}.bank-sim-badge{align-self:flex-start}.bank-card-number{font-size:15px;letter-spacing:.08em}.bank-card-bottom b{max-width:135px}.virtual-card-actions .table-action{font-size:9px;padding:6px 7px}}
+
+
+.schedule-direction-tabs{display:flex;gap:7px;margin:10px 0}
+.schedule-direction{border:1px solid #dce7f7;border-radius:10px;padding:8px 13px;background:#f5f8ff;color:#667792;font:inherit;font-size:11px;font-weight:800;cursor:pointer}
+.schedule-direction.active{background:#e7f0ff;border-color:#91b8ff;color:#3475df}
+.schedule-entry pre{white-space:pre-wrap;overflow-wrap:anywhere}
+#tripScheduleFolder,#tripSchedule{min-width:0}
