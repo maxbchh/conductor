@@ -32,7 +32,7 @@
 (()=>{
 'use strict';
 const URL='https://yycaxmfljqzfkjukplkz.supabase.co',KEY='sb_publishable_Ur6yP5_7LQ-9DGmriBJIpw_zIWJiM7T';
-const $=id=>document.getElementById(id),params=new URLSearchParams(location.search),shiftId=params.get('shift'),routeParam=params.get('route');
+const $=id=>document.getElementById(id),params=new URLSearchParams(location.search),shiftId=params.get('shift'),cashShiftId=params.get('cash'),routeParam=params.get('route');
 const client=window.supabase.createClient(URL,KEY,{auth:{persistSession:false}});
 let shift=null,routes=[],cards=[],route=null;
 const money=n=>Number(n||0).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' BYN';
@@ -57,7 +57,7 @@ async function finish(method){
  const btn=method==='cash'?$('payCash'):$('payByCard');btn.disabled=true;btn.textContent='Проверка…';
  try{
   const fare=x.mult===.5?'Льготный':x.mult===.75?'Школьный':'Полный';
-  const rows=Array.from({length:x.qty},()=>({shift_id:shift.id,route_id:x.r.id,route_name:x.r.name,from_stop:x.r.stops[x.a],to_stop:x.r.stops[x.b],stop_count:x.count,fare_type:fare,fare_multiplier:x.mult,fare_per_stop:x.per,amount:Number((x.count*x.per*x.mult).toFixed(2)),payment_method:method,cash_received:method==='cash'?Number((x.total/x.qty).toFixed(2)):Number((x.total/x.qty).toFixed(2)),change_due:0,game_time:shift.game_time}));
+  const rows=Array.from({length:x.qty},()=>({shift_id:shift.id,cash_shift_id:cashShiftId,route_id:x.r.id,route_name:x.r.name,from_stop:x.r.stops[x.a],to_stop:x.r.stops[x.b],stop_count:x.count,fare_type:fare,fare_multiplier:x.mult,fare_per_stop:x.per,amount:Number((x.count*x.per*x.mult).toFixed(2)),payment_method:method,cash_received:method==='cash'?Number((x.total/x.qty).toFixed(2)):Number((x.total/x.qty).toFixed(2)),change_due:0,game_time:shift.game_time}));
   let tickets;
   if(method==='card'){
    const cardId=$('payCard').value;if(!cardId)throw new Error('Выбери виртуальную карту');
