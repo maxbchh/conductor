@@ -83,7 +83,7 @@ async function init(){
   fill($('payCard'),cards.map(x=>({value:x.id,label:x.holder+' · '+money(x.balance)})),'Выбери карту для оплаты');
   $('payRoute').onchange=async()=>{updateStops();const id=$('payRoute').value;if(id&&shift.route_id!==id){const upd=await client.from('conductor_shifts').update({route_id:id,end_stop_index:routes.find(r=>r.id===id).stops.length-1}).eq('id',shift.id).select().single();if(!upd.error)shift=upd.data}};$('payTo').onchange=updateTotal;$('payFare').onchange=updateTotal;$('payQty').oninput=updateTotal;
   $('payCash').onclick=()=>finish('cash');$('payByCard').onclick=()=>finish('card');
-  updateStops();$('payStatus').textContent='Смена открыта';$('payStatus').className='shift-badge open';
+  updateStops();if($('payRoute').value&&shift.route_id!==$('payRoute').value){const route=routes.find(x=>x.id===$('payRoute').value);const assigned=await client.from('conductor_shifts').update({route_id:route.id,end_stop_index:shift.end_stop_index==null?route.stops.length-1:shift.end_stop_index}).eq('id',shift.id).select().single();if(!assigned.error)shift=assigned.data} $('payStatus').textContent='Смена открыта';$('payStatus').className='shift-badge open';
  }catch(e){$('payStatus').textContent='Нет активной смены';toast(e.message,'error')}
 }
 init();
