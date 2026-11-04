@@ -102,9 +102,10 @@ function showPhoneQr(){
  showModal('<p class="eyebrow">ПОКУПКА НА ТЕЛЕФОНЕ</p><h2>QR-код для телефона</h2><p class="hint">На другом устройстве открой камеру и наведи её на этот код. Откроется форма выбора остановки и оплаты.</p><div id="phoneQr" class="phone-qr"></div><p class="hint">'+esc(url)+'</p>');
  new QRCode($('phoneQr'),{text:url,width:220,height:220,correctLevel:QRCode.CorrectLevel.M});
 }
-function openPayment(){
- const x=updateFare();if(!x.valid){toast('Выбери маршрут и остановку назначения','error');return}
+async function openPayment(){
  if(!currentShift){toast('Сначала открой смену в разделе «Рейсы»','error');return}
+ const x=updateFare();if(!x.valid){toast('Выбери маршрут и остановку назначения','error');return}
+ if(currentShift.route_id!==x.r.id){await assignShiftRoute(x.r.id);if(currentShift.route_id!==x.r.id)return}
  const fareName=x.mult===.5?'Льготный':x.mult===.75?'Школьный':'Полный';
  const cards=db.cards.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.holder)+' · '+money(c.balance)+'</option>').join('');
  showModal('<p class="eyebrow">ПОДТВЕРЖДЕНИЕ ПОКУПКИ</p><h2>Оплата билета</h2><div class="payment-total">'+money(x.total)+'</div><div class="trip-info"><div><small>Маршрут</small><b>'+esc(x.r.name)+'</b></div><div><small>Путь</small><b>'+esc(x.r.stops[x.a])+' → '+esc(x.r.stops[x.b])+'</b></div><div><small>Тариф · количество</small><b>'+fareName+' · '+x.qty+'</b></div></div><label class="field"><span>Получено наличными</span><input id="cashReceived" type="number" min="'+x.total+'" step=".01" value="'+x.total.toFixed(2)+'"></label><div class="quick-cash">'+[1,2,3,4,5,10,15,20,25,30,35,40,45,50].map(n=>'<button type="button" data-cash="'+n+'">'+n+'</button>').join('')+'</div><label class="field"><span>Виртуальная карта</span><select id="cardForPayment"><option value="">Выбери карту</option>'+cards+'</select></label><div class="fare-summary"><div><small>К оплате</small><b>'+money(x.total)+'</b></div><div><small>Получено</small><b id="receivedValue">'+money(x.total)+'</b></div><div class="sum"><small>Сдача</small><b id="changeValue">0,00 BYN</b></div></div><div class="payment-methods"><button id="payCash" class="primary-btn">Наличными</button><button id="payCard" class="secondary-btn">Оплатить картой</button></div><p class="hint">Карта виртуальная, только для игровой симуляции. Настоящие банковские платежи не выполняются.</p>');
