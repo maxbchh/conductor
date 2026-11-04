@@ -6,7 +6,7 @@ const $=id=>document.getElementById(id);
 const money=n=>Number(n||0).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' BYN';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=p=>p+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);
-let db={routes:[],vehicles:[],shifts:[],tickets:[],schedules:[],cards:[],cashShifts:[],news:[]},activeScheduleFolder=null,client=null,currentShift=null,currentCashShift=null,lastTicket=null,lastTickets=[],toastTimer,realtimeChannel=null,realtimeRefreshTimer=null,realtimeLoading=false,gameClockState=null,gameClockSaving=false;
+let db={routes:[],vehicles:[],shifts:[],tickets:[],schedules:[],cards:[],cardTransactions:[],cashShifts:[],news:[]},activeScheduleFolder=null,client=null,currentShift=null,currentCashShift=null,lastTicket=null,lastTickets=[],toastTimer,realtimeChannel=null,realtimeRefreshTimer=null,realtimeLoading=false,gameClockState=null,gameClockSaving=false;
 const statusOptions=['В эксплуатации','На рейсе','Не в эксплуатации','Ремонт','Капитальный ремонт','Списан','Выведен из эксплуатации'];
 function toast(s,type=''){const el=$('toast');el.textContent=s;el.className='toast show '+type;clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3000)}
 function setCloud(s,cls){$('cloudState').className='cloud-state '+cls;$('cloudState').innerHTML='<i></i> '+s}
@@ -111,8 +111,72 @@ function renderRoutes(){
  const city=$('routesCity').value||'Тверь',rows=db.routes.filter(r=>r.city===city&&!r.archived_at);
  $('routesList').innerHTML=rows.length?'<table><thead><tr><th>Маршрут</th><th>Остановки</th><th>Цена за остановку</th><th></th></tr></thead><tbody>'+rows.map(r=>'<tr><td><span class="row-title">'+esc(r.name)+'</span><span class="subtext">'+esc(r.city)+'</span></td><td>'+((r.stops||[]).length)+' остановок</td><td>'+money(r.fare_per_stop)+'</td><td><button class="table-action" data-edit-route="'+esc(r.id)+'">Изменить</button><button class="table-action" data-archive-route="'+esc(r.id)+'">Удалить</button></td></tr>').join('')+'</tbody></table>':'<div class="empty-state">Маршруты не найдены</div>';
 }
-function renderCards(){const el=$('cardsList');if(!el)return;el.innerHTML=db.cards.length?db.cards.map(c=>'<div class="card-row"><div><b>'+esc(c.holder)+'</b><div class="subtext">'+esc(c.label)+'</div><div class="card-balance">Баланс: '+money(c.balance)+'</div></div><button class="table-action" data-edit-card="'+esc(c.id)+'">Изменить баланс</button></div>').join(''):'<div class="empty-state">Виртуальных карт пока нет</div>'}
-function openCardEditor(card){const edit=!!card;showModal('<p class="eyebrow">ВИРТУАЛЬНАЯ КАРТА</p><h2>'+(edit?'Настроить карту':'Новая карта')+'</h2><div class="field-grid"><label class="field full"><span>Имя владельца</span><input id="cardHolder" value="'+esc(card?.holder||'')+'"></label><label class="field full"><span>Название карты</span><input id="cardLabel" value="'+esc(card?.label||'Карта Conductor')+'"></label><label class="field full"><span>Баланс (BYN)</span><input id="cardBalance" type="number" min="0" step=".01" value="'+esc(card?.balance??0)+'"></label></div><div class="modal-actions"><button id="saveCard" class="primary-btn">Сохранить</button></div>');$('saveCard').onclick=async()=>{const p={holder:$('cardHolder').value.trim(),label:$('cardLabel').value.trim(),balance:Math.max(0,Number($('cardBalance').value)||0)};if(!p.holder||!p.label){toast('Заполни имя и название карты','error');return}try{const q=edit?await client.from('conductor_cards').update(p).eq('id',card.id).select().single():await client.from('conductor_cards').insert({...p,id:uid('card')}).select().single();if(q.error)throw q.error;if(edit)db.cards=db.cards.map(x=>x.id===card.id?q.data:x);else db.cards.push(q.data);closeModal();renderCards();toast('Виртуальная карта сохранена','success')}catch(e){toast('Ошибка карты: '+e.message,'error')}}}
+
+function makeVirtualCardNumber(){
+ const used=new Set(db.cards.map(c=>String(c.card_number||'')));
+ let number='';
+ do{number='9900'+Array.from({length:3},()=>String(Math.floor(Math.random()*10000)).padStart(4,'0')).join('')}while(used.has(number));
+ return number;
+}
+function displayVirtualCardNumber(value){return String(value||'').replace(/(\\d{4})(?=\\d)/g,'$1 ')}
+function renderCards(){
+ const el=$('cardsList');if(!el)return;
+ el.innerHTML=db.cards.length?db.cards.map(c=>{
+  const color=['blue','violet','green','dark'].includes(c.card_color)?c.card_color:'blue';
+  return '<article class="virtual-card-row"><div class="virtual-card-face '+color+'"><div class="virtual-card-face-top"><b>'+esc(c.bank_name||'Conductor Bank')+'</b><span>CONDUCTOR · SIM</span></div><div class="virtual-card-number">'+esc(displayVirtualCardNumber(c.card_number))+'</div><div class="virtual-card-face-bottom"><span>'+esc(c.holder)+'</span><b>'+esc(c.card_type||'Классическая')+'</b></div></div><div class="virtual-card-meta"><b>'+esc(c.label||'Виртуальная карта')+'</b><span class="subtext">'+esc(c.bank_name||'Conductor Bank')+' · '+esc(c.card_type||'Классическая')+'</span><strong>'+money(c.balance)+'</strong><div class="virtual-card-actions"><button class="table-action" data-card-topup="'+esc(c.id)+'">Пополнить</button><button class="table-action" data-card-withdraw="'+esc(c.id)+'">Списать</button><button class="table-action" data-card-empty="'+esc(c.id)+'">Обнулить</button><button class="table-action" data-card-history="'+esc(c.id)+'">История</button><button class="table-action" data-edit-card="'+esc(c.id)+'">Настроить</button></div></div></article>';
+ }).join(''):'<div class="empty-state">Пока нет виртуальных карт. Нажми «＋ Создать карту», чтобы выпустить первую.</div>';
+}
+function openCardHistory(card){
+ const rows=db.cardTransactions.filter(t=>t.card_id===card.id).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+ const labels={top_up:'Пополнение',withdrawal:'Списание',empty:'Обнуление баланса',purchase:'Покупка билета'};
+ showModal('<p class="eyebrow">ВИРТУАЛЬНЫЙ БАНК · ИСТОРИЯ</p><h2>'+esc(card.label||'Карта')+'</h2><p class="muted">'+esc(card.bank_name||'Conductor Bank')+' · '+esc(displayVirtualCardNumber(card.card_number))+'</p><div class="card-history-list">'+(rows.length?rows.map(t=>'<div class="card-history-row"><div><b>'+esc(labels[t.transaction_type]||'Операция')+'</b><small>'+new Date(t.created_at).toLocaleString('ru-RU')+(t.ticket_numbers?' · билет № '+esc(t.ticket_numbers):'')+'</small></div><div><b>'+money(t.amount)+'</b><small>Остаток: '+money(t.balance_after)+'</small></div></div>').join(''):'<div class="empty-state">Операций пока нет</div>')+'</div>');
+}
+async function adjustVirtualCard(cardId,action){
+ const card=db.cards.find(c=>c.id===cardId);if(!card)return;
+ let amount=null;
+ if(action==='empty'){
+  if(!confirm('Обнулить баланс карты '+(card.label||'')+'? Вся сумма будет записана в историю.'))return;
+ }else{
+  const label=action==='top_up'?'Сумма пополнения (BYN)':'Сумма списания (BYN)';
+  const raw=prompt(label,'10.00');if(raw===null)return;
+  amount=Number(String(raw).replace(',','.'));
+  if(!Number.isFinite(amount)||amount<=0){toast('Укажи сумму больше нуля','error');return}
+ }
+ try{
+  const q=await client.rpc('conductor_adjust_virtual_card',{p_card_id:cardId,p_action:action,p_amount:amount,p_note:action==='top_up'?'Пополнение виртуального счёта':action==='withdrawal'?'Списание с виртуального счёта':'Баланс обнулён вручную'});
+  if(q.error)throw q.error;
+  if(!q.data?.ok)throw new Error('Операция не выполнена');
+  db.cards=db.cards.map(c=>c.id===cardId?{...c,balance:Number(q.data.balance)}:c);
+  if(q.data.transaction)db.cardTransactions.unshift(q.data.transaction);
+  renderCards();toast(action==='top_up'?'Баланс пополнен':action==='withdrawal'?'Средства списаны':'Баланс обнулён','success');
+ }catch(e){toast('Ошибка операции: '+(e.message||String(e)),'error')}
+}
+function openCardEditor(card){
+ const edit=!!card,number=card?.card_number||makeVirtualCardNumber();
+ showModal('<p class="eyebrow">ВИРТУАЛЬНЫЙ БАНК CONDUCTOR</p><h2>'+(edit?'Настроить карту':'Выпустить виртуальную карту')+'</h2><p class="hint">Это игровая карта. Номер выдуманный, не является банковским реквизитом. Не вводи данные настоящих карт.</p><div class="field-grid"><label class="field"><span>Владелец</span><input id="cardHolder" maxlength="80" value="'+esc(card?.holder||'')+'"></label><label class="field"><span>Название карты</span><input id="cardLabel" maxlength="80" value="'+esc(card?.label||'Карта Conductor')+'"></label><label class="field full"><span>Название виртуального банка</span><input id="cardBank" maxlength="50" value="'+esc(card?.bank_name||'Conductor Bank')+'"></label><label class="field full"><span>Выдуманный номер карты · 16 цифр</span><input id="cardNumber" inputmode="numeric" autocomplete="off" maxlength="16" value="'+esc(number)+'"></label><label class="field"><span>Тип карты</span><select id="cardType"><option '+((card?.card_type||'Классическая')==='Классическая'?'selected':'')+'>Классическая</option><option '+(card?.card_type==='Транспортная'?'selected':'')+'>Транспортная</option><option '+(card?.card_type==='Премиальная'?'selected':'')+'>Премиальная</option><option '+(card?.card_type==='Молодёжная'?'selected':'')+'>Молодёжная</option></select></label><label class="field"><span>Цвет карты</span><select id="cardColor"><option value="blue" '+((card?.card_color||'blue')==='blue'?'selected':'')+'>Синий</option><option value="violet" '+(card?.card_color==='violet'?'selected':'')+'>Фиолетовый</option><option value="green" '+(card?.card_color==='green'?'selected':'')+'>Зелёный</option><option value="dark" '+(card?.card_color==='dark'?'selected':'')+'>Тёмный</option></select></label>'+(edit?'':'<label class="field full"><span>Начальный баланс (BYN)</span><input id="cardInitialBalance" type="number" min="0" step=".01" value="0"></label>')+'</div><div class="modal-actions"><button id="saveCard" class="primary-btn">Сохранить карту</button></div>');
+ $('cardNumber').addEventListener('input',()=>{$('cardNumber').value=$('cardNumber').value.replace(/\\D/g,'').slice(0,16)});
+ $('saveCard').onclick=async()=>{
+  const p={holder:$('cardHolder').value.trim(),label:$('cardLabel').value.trim()||'Виртуальная карта',bank_name:$('cardBank').value.trim()||'Conductor Bank',card_number:$('cardNumber').value.trim(),card_type:$('cardType').value,card_color:$('cardColor').value};
+  const initial=edit?0:Math.max(0,Number($('cardInitialBalance').value)||0);
+  if(!p.holder){toast('Укажи владельца карты','error');return}
+  if(!/^\\d{16}$/.test(p.card_number)){toast('Номер карты должен содержать ровно 16 цифр','error');return}
+  if(db.cards.some(c=>c.card_number===p.card_number&&c.id!==card?.id)){toast('Такой выдуманный номер уже занят','error');return}
+  try{
+   const q=edit?await client.from('conductor_cards').update(p).eq('id',card.id).select().single():await client.from('conductor_cards').insert({...p,id:uid('card'),balance:0}).select().single();
+   if(q.error)throw q.error;
+   let saved=q.data;
+   if(edit)db.cards=db.cards.map(c=>c.id===card.id?saved:c);else db.cards.push(saved);
+   if(!edit&&initial>0){
+    const top=await client.rpc('conductor_adjust_virtual_card',{p_card_id:saved.id,p_action:'top_up',p_amount:initial,p_note:'Начальное пополнение при выпуске карты'});
+    if(top.error)throw top.error;
+    saved={...saved,balance:Number(top.data.balance)};
+    db.cards=db.cards.map(c=>c.id===saved.id?saved:c);
+    if(top.data.transaction)db.cardTransactions.unshift(top.data.transaction);
+   }
+   closeModal();renderCards();toast(edit?'Данные карты сохранены':'Виртуальная карта выпущена','success');
+  }catch(e){toast('Ошибка карты: '+(e.message||String(e)),'error')}
+ };
+}
 function renderTickets(){
  const active=db.tickets.filter(t=>!t.archived_at);
  const rows=[...active].sort((a,b)=>b.ticket_number-a.ticket_number).slice(0,100);
@@ -172,8 +236,12 @@ async function completeSale(x,method,received,cardId){
    if(charge.error)throw charge.error;
    if(!charge.data?.ok)throw new Error('Недостаточно средств на виртуальной карте');
    data=charge.data.tickets;
-   const refreshed=await client.from('conductor_cards').select('*').eq('id',cardId).single();
+   const [refreshed,history]=await Promise.all([
+    client.from('conductor_cards').select('*').eq('id',cardId).single(),
+    client.from('conductor_card_transactions').select('*').eq('card_id',cardId).order('created_at',{ascending:false}).limit(200)
+   ]);
    if(!refreshed.error)db.cards=db.cards.map(c=>c.id===cardId?refreshed.data:c);
+   if(!history.error)db.cardTransactions=db.cardTransactions.filter(t=>t.card_id!==cardId).concat(history.data||[]);
   }else{
    const q=await client.from('conductor_tickets').insert(rows).select('*');if(q.error)throw q.error;data=q.data;
   }
@@ -284,19 +352,20 @@ function renderAll(){renderRouteSelects();renderFleet();renderRoutes();renderCar
 async function fetchAllTickets(){const all=[];let start=0;const pageSize=1000;while(true){const q=await client.from('conductor_tickets').select('*').order('ticket_number',{ascending:false}).range(start,start+pageSize-1);if(q.error)throw q.error;const rows=q.data||[];all.push(...rows);if(rows.length<pageSize)break;start+=pageSize;}return all;}
 async function loadData(){
  setCloud('Загрузка базы…','');
- const [r,v,s,t,sch,cards,cs,news,gc]=await Promise.all([
+ const [r,v,s,t,sch,cards,cardTransactions,cs,news,gc]=await Promise.all([
   client.from('conductor_routes').select('*').order('city').order('name'),
   client.from('conductor_vehicles').select('*').order('city').order('number'),
   client.from('conductor_shifts').select('*').order('started_at',{ascending:false}).limit(100),
   fetchAllTickets(),
   client.from('conductor_schedules').select('*').order('folder').order('title'),
   client.from('conductor_cards').select('*').order('holder'),
+  client.from('conductor_card_transactions').select('*').order('created_at',{ascending:false}).limit(300),
   client.from('conductor_cash_shifts').select('*').order('started_at',{ascending:false}).limit(100),
   client.from('conductor_news').select('*').order('published_at',{ascending:false}).limit(200),
    client.from('conductor_game_clock').select('*').eq('id','main').maybeSingle()
   ]);
- for(const [label,x] of [['маршруты',r],['подвижной состав',v],['водительские смены',s],['расписания',sch],['виртуальные карты',cards],['кассовые смены',cs],['городские новости',news],['игровые часы',gc]])if(x.error)throw new Error(label+': '+x.error.message+' · '+(x.error.code||'без кода'));
- db={routes:(r.data||[]).filter(x=>x.city==='Тверь'),vehicles:(v.data||[]).filter(x=>x.city==='Тверь'),shifts:s.data||[],tickets:t||[],schedules:sch.data||[],cards:cards.data||[],cashShifts:cs.data||[],news:news.data||[]};
+ for(const [label,x] of [['маршруты',r],['подвижной состав',v],['водительские смены',s],['расписания',sch],['виртуальные карты',cards],['история виртуального банка',cardTransactions],['кассовые смены',cs],['городские новости',news],['игровые часы',gc]])if(x.error)throw new Error(label+': '+x.error.message+' · '+(x.error.code||'без кода'));
+ db={routes:(r.data||[]).filter(x=>x.city==='Тверь'),vehicles:(v.data||[]).filter(x=>x.city==='Тверь'),shifts:s.data||[],tickets:t||[],schedules:sch.data||[],cards:cards.data||[],cardTransactions:cardTransactions.data||[],cashShifts:cs.data||[],news:news.data||[]};
  currentShift=db.shifts.find(s=>s.status==='open')||null;currentCashShift=db.cashShifts.find(s=>s.status==='open')||null;gameClockState=gc.data||null;
  if(currentShift){const activeRoute=db.routes.find(r=>r.id===currentShift.route_id&&!r.archived_at);if(activeRoute){const max=activeRoute.stops.length-1,current=Math.max(0,Math.min(Number(currentShift.current_stop_index||0),max)),end=Math.max(current,Math.min(Number(currentShift.end_stop_index??max),max));if(current!==currentShift.current_stop_index||end!==currentShift.end_stop_index){const fixed=await client.from('conductor_shifts').update({current_stop_index:current,end_stop_index:end}).eq('id',currentShift.id).select().single();if(!fixed.error){currentShift=fixed.data;db.shifts=db.shifts.map(s=>s.id===fixed.data.id?fixed.data:s)}}}}
  setCloud('База синхронизирована','ok');renderAll();renderGameClock();
@@ -313,7 +382,7 @@ function init(){
  $('openPayment').onclick=openPayment;$('printTicket').onclick=()=>ticketPrint(lastTickets.length?lastTickets:lastTicket);$('showPhoneQr').onclick=showPhoneQr;$('addScheduleFolder').onclick=()=>{const f=prompt('Название папки маршрута, например 102:');if(!f)return;activeScheduleFolder=f.trim();editSchedule(null)};$('scheduleFolders').onclick=e=>{const b=e.target.closest('[data-folder]');if(b){activeScheduleFolder=b.dataset.folder;renderSchedules()}};$('scheduleEntries').onclick=e=>{const add=e.target.closest('#addScheduleText'),edit=e.target.closest('[data-edit-schedule]');if(add)editSchedule(null);if(edit)editSchedule(db.schedules.find(s=>s.id===edit.dataset.editSchedule))};
  $('tripCity').onchange=renderRouteSelects;$('liveRoute').onchange=()=>assignShiftRoute($('liveRoute').value);$('liveCurrentStop').onchange=()=>{if(currentShift){$('liveCurrentStop').value=String(currentShift.current_stop_index||0);toast('Используй кнопку «Следующая остановка»')}};$('liveEndStop').onchange=async()=>{if(!currentShift)return;const i=Number($('liveEndStop').value),current=Number(currentShift.current_stop_index||0);if(!Number.isInteger(i)||i<current){$('liveEndStop').value=String(currentShift.end_stop_index??current);toast('Конечная остановка не может быть раньше текущей','error');return}const route=activeTripRoute();if(!route||i>=route.stops.length){toast('Остановка не принадлежит действующему маршруту','error');syncTripStops();return}const q=await client.from('conductor_shifts').update({end_stop_index:i}).eq('id',currentShift.id).select().single();if(q.error){toast(q.error.message,'error');return}currentShift=q.data;db.shifts=db.shifts.map(s=>s.id===q.data.id?q.data:s);updateSaleStops();updateRouteSummary();toast('Конечная остановка рейса изменена','success')};$('gameClockPause').onclick=toggleGameClockPause;$('gameClockRate').onchange=()=>changeGameClockRate($('gameClockRate').value);$('gameClockBackHour').onclick=()=>jumpGameClock(-60);$('gameClockBack15').onclick=()=>jumpGameClock(-15);$('gameClockForward15').onclick=()=>jumpGameClock(15);$('gameClockForwardHour').onclick=()=>jumpGameClock(60);$('gameClockSet').onclick=setGameClockManually;$('gameClockManual').oninput=()=>{$('gameClockManual').dataset.touched='1'};$('startShift').onclick=startShift;$('endShift').onclick=endShift;$('tripNextStop').onclick=nextStop;$('cashNextStop').onclick=nextStop;$('openCashShift').onclick=openCashShift;$('closeCashShift').onclick=closeCashShift;
  $('dbCity').onchange=renderFleet;$('fleetSearch').oninput=renderFleet;$('routesCity').onchange=renderRoutes;
- $('addCard').onclick=()=>openCardEditor(null);$('cardsList').onclick=e=>{const b=e.target.closest('[data-edit-card]');if(b)openCardEditor(db.cards.find(c=>c.id===b.dataset.editCard))};$('addVehicle').onclick=()=>openVehicleEditor(null);$('addRoute').onclick=()=>openRouteEditor(null);$('tripAddRoute').onclick=()=>openRouteEditor(null);$('tripRoutesList').onclick=e=>{const ed=e.target.closest('[data-trip-edit-route]'),sel=e.target.closest('[data-trip-select-route]');if(ed)openRouteEditor(db.routes.find(r=>r.id===ed.dataset.tripEditRoute));if(sel)assignShiftRoute(sel.dataset.tripSelectRoute)};
+ $('addCard').onclick=()=>openCardEditor(null);$('cardsList').onclick=e=>{const edit=e.target.closest('[data-edit-card]'),top=e.target.closest('[data-card-topup]'),withdraw=e.target.closest('[data-card-withdraw]'),empty=e.target.closest('[data-card-empty]'),history=e.target.closest('[data-card-history]');if(edit)openCardEditor(db.cards.find(c=>c.id===edit.dataset.editCard));if(top)adjustVirtualCard(top.dataset.cardTopup,'top_up');if(withdraw)adjustVirtualCard(withdraw.dataset.cardWithdraw,'withdrawal');if(empty)adjustVirtualCard(empty.dataset.cardEmpty,'empty');if(history){const card=db.cards.find(c=>c.id===history.dataset.cardHistory);if(card)openCardHistory(card)}};$('addVehicle').onclick=()=>openVehicleEditor(null);$('addRoute').onclick=()=>openRouteEditor(null);$('tripAddRoute').onclick=()=>openRouteEditor(null);$('tripRoutesList').onclick=e=>{const ed=e.target.closest('[data-trip-edit-route]'),sel=e.target.closest('[data-trip-select-route]');if(ed)openRouteEditor(db.routes.find(r=>r.id===ed.dataset.tripEditRoute));if(sel)assignShiftRoute(sel.dataset.tripSelectRoute)};
  $('fleetList').onclick=e=>{const b=e.target.closest('[data-edit-vehicle]'),d=e.target.closest('[data-archive-vehicle]');if(b)openVehicleEditor(db.vehicles.find(v=>v.id===b.dataset.editVehicle));if(d)archiveRecord('conductor_vehicles',d.dataset.archiveVehicle)};
  $('routesList').onclick=e=>{const b=e.target.closest('[data-edit-route]'),d=e.target.closest('[data-archive-route]');if(b)openRouteEditor(db.routes.find(r=>r.id===b.dataset.editRoute));if(d)archiveRecord('conductor_routes',d.dataset.archiveRoute)};
  $('addNews').onclick=editNews;$('newsList').onclick=e=>{const d=e.target.closest('[data-archive-news]');if(d)archiveRecord('conductor_news',d.dataset.archiveNews)};$('archiveList').onclick=e=>{const b=e.target.closest('[data-restore-table]');if(b)restoreRecord(b.dataset.restoreTable,b.dataset.restoreId,b.dataset.restoreKey)};$('ticketsList').onclick=e=>{const b=e.target.closest('[data-archive-ticket]');if(b)archiveRecord('conductor_tickets',b.dataset.archiveTicket,'ticket_number')};
