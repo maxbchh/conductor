@@ -48,6 +48,7 @@ function renderVehicleSelect(){
 }
 function renderInfo(){
  const route=activeTripRoute(),vehicle=activeVehicle();
+ $('gameClock').textContent=currentShift?.game_time||$('tripGameTime').value||'—';
  $('infoRoute').textContent=route?route.name:'—';$('infoVehicle').textContent=vehicle?(vehicle.number+' · '+vehicle.model):'—';
  $('infoGameTime').textContent=currentShift?.game_time||'—';$('cashContext').textContent=currentShift?'Рейс '+(route?.name||'')+' · '+(vehicle?.number||''):'Смена не открыта';
  $('shiftBadge').textContent=currentShift?'Смена открыта':'Смена закрыта';$('shiftBadge').className='shift-badge '+(currentShift?'open':'closed');
@@ -97,7 +98,7 @@ function openPayment(){
  const input=$('cashReceived');
  function change(){const received=Math.max(0,Number(input.value)||0);$('receivedValue').textContent=money(received);$('changeValue').textContent=money(Math.max(0,received-x.total));}
  input.addEventListener('input',change);
- document.querySelectorAll('[data-cash]').forEach(b=>b.addEventListener('click',()=>{input.value=(Number(input.value)||0)+Number(b.dataset.cash);change()}));
+ document.querySelectorAll('[data-cash]').forEach(b=>b.addEventListener('click',()=>{input.value=Number(b.dataset.cash).toFixed(2);change()}));
  $('payCash').addEventListener('click',()=>{const received=Number(input.value)||0;if(received+0.00001<x.total){toast('Недостаточно наличных');return}completeSale(x,'cash',received)});
  $('payCard').addEventListener('click',()=>completeSale(x,'card',x.total));
 }
@@ -164,7 +165,7 @@ function init(){
  $('saleRoute').onchange=updateSaleStops;$('saleFrom').onchange=updateFare;$('saleTo').onchange=updateFare;$('saleFare').onchange=updateFare;$('saleQty').oninput=updateFare;
  $('qtyMinus').onclick=()=>{$('saleQty').value=Math.max(1,Number($('saleQty').value)-1);updateFare()};$('qtyPlus').onclick=()=>{$('saleQty').value=Math.min(20,Number($('saleQty').value)+1);updateFare()};
  $('openPayment').onclick=openPayment;$('printTicket').onclick=()=>ticketPrint(lastTicket);
- $('tripCity').onchange=renderRouteSelects;$('startShift').onclick=startShift;$('endShift').onclick=endShift;
+ $('tripCity').onchange=renderRouteSelects;$('tripGameTime').oninput=()=>{if(!currentShift)$('gameClock').textContent=$('tripGameTime').value||'—'};$('startShift').onclick=startShift;$('endShift').onclick=endShift;
  $('dbCity').onchange=renderFleet;$('fleetSearch').oninput=renderFleet;$('routesCity').onchange=renderRoutes;
  $('addVehicle').onclick=()=>openVehicleEditor(null);$('addRoute').onclick=()=>openRouteEditor(null);
  $('fleetList').onclick=e=>{const b=e.target.closest('[data-edit-vehicle]');if(b)openVehicleEditor(db.vehicles.find(v=>v.id===b.dataset.editVehicle))};
