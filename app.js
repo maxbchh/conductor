@@ -73,6 +73,7 @@ function renderTickets(){
  $('ticketCount').textContent=db.tickets.length+' билетов';
  $('ticketsList').innerHTML=rows.length?'<table><thead><tr><th>Билет</th><th>Маршрут</th><th>Откуда → Куда</th><th>Тариф</th><th>Оплата</th><th>Сумма</th></tr></thead><tbody>'+rows.map(t=>'<tr><td><b>#'+t.ticket_number+'</b><span class="subtext">'+new Date(t.issued_at).toLocaleString('ru-RU')+'</span></td><td>'+esc(t.route_name||'—')+'</td><td>'+esc(t.from_stop)+' → '+esc(t.to_stop)+'</td><td>'+esc(t.fare_type)+'</td><td>'+esc(t.payment_method==='card'?'Карта':'Наличные')+'</td><td><b>'+money(t.amount)+'</b></td></tr>').join('')+'</tbody></table>':'<div class="empty-state">Проданных билетов пока нет</div>';
 }
+function syncTripStops(){const r=db.routes.find(x=>x.id===$('tripRoute').value);if(!r)return;['tripCurrentStop','tripEndStop','liveCurrentStop'].forEach(id=>{const el=$(id);if(el)el.innerHTML=r.stops.map((s,i)=>'<option value="'+i+'">'+(i+1)+'. '+esc(s)+'</option>').join('')});if($('tripEndStop'))$('tripEndStop').value=String(r.stops.length-1);if(currentShift&&$('liveCurrentStop'))$('liveCurrentStop').value=String(currentShift.current_stop_index||0)}
 function renderHistory(){
  const rows=[...db.shifts].sort((a,b)=>new Date(b.started_at)-new Date(a.started_at)).slice(0,20);
  $('shiftHistory').innerHTML=rows.length?'<div class="table-wrap"><table><thead><tr><th>Маршрут</th><th>Состав</th><th>Игровое время</th><th>Статус</th><th>Начало</th></tr></thead><tbody>'+rows.map(s=>{const r=db.routes.find(x=>x.id===s.route_id),v=db.vehicles.find(x=>x.id===s.vehicle_id);return '<tr><td>'+esc(r?.name||'—')+'</td><td>'+esc(v?.number||'—')+'</td><td>'+esc(s.game_time||'—')+'</td><td><span class="status-tag '+(s.status==='open'?'active':'')+'">'+(s.status==='open'?'Открыт':'Завершён')+'</span></td><td>'+new Date(s.started_at).toLocaleString('ru-RU')+'</td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty-state">Рейсов пока нет</div>';
@@ -158,9 +159,9 @@ async function startShift(){
  if(currentShift){toast('Смена уже открыта');return}
  const route=db.routes.find(r=>r.id===$('tripRoute').value),vehicle=db.vehicles.find(v=>v.id===$('tripVehicle').value);
  if(!route||!vehicle){toast('Выбери маршрут и подвижной состав');return}
- const gameTime=$('tripGameTime').value||'08:00';
+ const gameTime=$('tripGameTime').value||'08:00';const startIndex=Number($('tripCurrentStop').value||0),endIndex=Number($('tripEndStop').value||route.stops.length-1);if(endIndex<=startIndex){toast('Конечная остановка должна быть после начальной');return}
  try{
-  const {data,error}=await client.from('conductor_shifts').insert({id:uid('shift'),route_id:route.id,vehicle_id:vehicle.id,game_time:gameTime,status:'open',started_at:new Date().toISOString(),previous_vehicle_status:vehicle.status}).select().single();if(error)throw error;
+  const {data,error}=await client.from('conductor_shifts').insert({id:uid('shift'),route_id:route.id,vehicle_id:vehicle.id,game_time:gameTime,status:'open',started_at:new Date().toISOString(),previous_vehicle_status:vehicle.status,current_stop_index:startIndex,end_stop_index:endIndex}).select().single();if(error)throw error;
   const upd=await client.from('conductor_vehicles').update({status:'На рейсе',previous_status:vehicle.status}).eq('id',vehicle.id).select().single();if(upd.error){await client.from('conductor_shifts').delete().eq('id',data.id);throw upd.error}
   Object.assign(vehicle,upd.data);currentShift=data;db.shifts.unshift(data);renderAll();toast('Смена открыта · рейс '+route.name);
  }catch(e){toast('Не удалось открыть смену: '+e.message)}
@@ -199,7 +200,7 @@ function init(){
  $('saleRoute').onchange=updateSaleStops;$('saleFrom').onchange=updateFare;$('saleTo').onchange=updateFare;$('saleFare').onchange=updateFare;$('saleQty').oninput=updateFare;
  $('qtyMinus').onclick=()=>{$('saleQty').value=Math.max(1,Number($('saleQty').value)-1);updateFare()};$('qtyPlus').onclick=()=>{$('saleQty').value=Math.min(20,Number($('saleQty').value)+1);updateFare()};
  $('openPayment').onclick=openPayment;$('printTicket').onclick=()=>ticketPrint(lastTicket);$('scanQr').onclick=scanQr;$('addScheduleFolder').onclick=()=>{const f=prompt('Название папки маршрута, например 102:');if(!f)return;activeScheduleFolder=f.trim();editSchedule(null)};
- $('tripCity').onchange=renderRouteSelects;$('tripGameTime').oninput=()=>{if(!currentShift)$('gameClock').textContent=$('tripGameTime').value||'—'};$('startShift').onclick=startShift;$('endShift').onclick=endShift;
+ $('tripCity').onchange=renderRouteSelects;$('tripRoute').onchange=syncTripStops;$('liveCurrentStop').onchange=async()=>{if(!currentShift)return;const i=Number($('liveCurrentStop').value);try{const q=await client.from('conductor_shifts').update({current_stop_index:i}).eq('id',currentShift.id).select().single();if(q.error)throw q.error;currentShift=q.data;db.shifts=db.shifts.map(s=>s.id===q.data.id?q.data:s);renderInfo();$('saleFrom').value=String(i);updateFare();toast('Текущая остановка обновлена')}catch(e){toast('Ошибка: '+e.message)}};$('tripGameTime').oninput=()=>{if(!currentShift)$('gameClock').textContent=$('tripGameTime').value||'—'};$('startShift').onclick=startShift;$('endShift').onclick=endShift;
  $('dbCity').onchange=renderFleet;$('fleetSearch').oninput=renderFleet;$('routesCity').onchange=renderRoutes;
  $('addVehicle').onclick=()=>openVehicleEditor(null);$('addRoute').onclick=()=>openRouteEditor(null);
  $('fleetList').onclick=e=>{const b=e.target.closest('[data-edit-vehicle]');if(b)openVehicleEditor(db.vehicles.find(v=>v.id===b.dataset.editVehicle))};
