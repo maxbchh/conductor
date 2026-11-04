@@ -22,7 +22,7 @@ function renderRouteSelects(){
  const opts=routes.map(r=>({value:r.id,label:r.name+' · '+r.city}));
  const previous=$('tripRoute').value;fillSelect($('tripRoute'),opts,'Выберите маршрут');if(routes.some(r=>r.id===previous))$('tripRoute').value=previous;
  const saleOpts=db.routes.map(r=>({value:r.id,label:r.name+' · '+r.city}));
- const old=$('saleRoute').value;fillSelect($('saleRoute'),saleOpts,'Выберите маршрут');if(db.routes.some(r=>r.id===old))$('saleRoute').value=old;
+ const old=$('saleRoute').value;fillSelect($('saleRoute'),saleOpts,'Выберите маршрут');if(currentShift&&db.routes.some(r=>r.id===currentShift.route_id))$('saleRoute').value=currentShift.route_id;else if(db.routes.some(r=>r.id===old))$('saleRoute').value=old;
  updateSaleStops();renderVehicleSelect();renderInfo();
 }
 function updateSaleStops(){
@@ -81,7 +81,9 @@ function renderHistory(){
 function renderTicket(t){
  if(!t)return;
  lastTicket=t;
- $('ticketPreview').innerHTML='<b>БИЛЕТ № '+esc(t.ticket_number)+'</b><span>От: '+esc(t.from_stop)+'</span><span>До: '+esc(t.to_stop)+'</span><strong>'+money(t.amount)+'</strong>';
+ $('ticketPreview').innerHTML='<b>БИЛЕТ № '+esc(t.ticket_number)+'</b><span>От: '+esc(t.from_stop)+'</span><span>До: '+esc(t.to_stop)+'</span><strong>'+money(t.amount)+'</strong><div id="ticketQr" class="ticket-qr"></div>';
+ const route=db.routes.find(r=>r.id===t.route_id),from=route?route.stops.indexOf(t.from_stop):0,to=route?route.stops.indexOf(t.to_stop):Math.max(1,Number(t.stop_count)||1);
+ if(window.QRCode)new QRCode($('ticketQr'),{text:'CONDUCTOR|'+t.route_id+'|'+Math.max(0,from)+'|'+Math.max(1,to),width:76,height:76,correctLevel:QRCode.CorrectLevel.M});
 }
 function renderAll(){renderRouteSelects();renderFleet();renderRoutes();renderTickets();renderHistory();renderStats();renderInfo();renderSchedules()}
 
@@ -120,7 +122,7 @@ function parseQr(raw){
 function ticketPrint(t){
  if(!t){toast('Сначала продай билет');return}
  let root=document.getElementById('ticketPrintRoot');if(root)root.remove();
- root=document.createElement('div');root.id='ticketPrintRoot';root.innerHTML='<div class="ticket-paper printable"><b>БИЛЕТ № '+esc(t.ticket_number)+'</b><span>От: '+esc(t.from_stop)+'</span><span>До: '+esc(t.to_stop)+'</span><strong>'+money(t.amount)+'</strong></div>';
+ root=document.createElement('div');root.id='ticketPrintRoot';root.innerHTML='<div class="ticket-paper printable"><b>БИЛЕТ № '+esc(t.ticket_number)+'</b><span>От: '+esc(t.from_stop)+'</span><span>До: '+esc(t.to_stop)+'</span><strong>'+money(t.amount)+'</strong><div id="printTicketQr" class="ticket-qr"></div></div>';const route=db.routes.find(r=>r.id===t.route_id),from=route?route.stops.indexOf(t.from_stop):0,to=route?route.stops.indexOf(t.to_stop):Math.max(1,Number(t.stop_count)||1);if(window.QRCode)new QRCode($('printTicketQr'),{text:'CONDUCTOR|'+t.route_id+'|'+Math.max(0,from)+'|'+Math.max(1,to),width:64,height:64,correctLevel:QRCode.CorrectLevel.M});
  document.body.appendChild(root);document.body.classList.add('print-ticket');window.print();
  window.onafterprint=()=>{document.body.classList.remove('print-ticket');root.remove();};
 }
