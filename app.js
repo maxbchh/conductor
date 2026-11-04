@@ -20,7 +20,7 @@ function renderRouteSelects(){
  const routes=db.routes.filter(r=>r.city==='Тверь'),opts=routes.map(r=>({value:r.id,label:r.name})),old=$('saleRoute').value;
  fillSelect($('saleRoute'),opts,'Выберите маршрут');fillSelect($('liveRoute'),opts,'Выбери маршрут');if(currentShift?.route_id)$('liveRoute').value=currentShift.route_id;
  fillSelect($('liveRoute'),opts,'Выбери маршрут');if(currentShift?.route_id)$('liveRoute').value=currentShift.route_id;
- const chosen=currentShift?.route_id||old;if(chosen&&routes.some(r=>r.id===chosen))$('saleRoute').value=chosen;
+ const chosen=currentShift?(currentShift.route_id||''):old;if(chosen&&routes.some(r=>r.id===chosen))$('saleRoute').value=chosen;else if(currentShift)$('saleRoute').value='';
  updateSaleStops();renderVehicleSelect();renderInfo();
 }
 function updateSaleStops(){
@@ -97,7 +97,7 @@ function ticketPrint(t){
 function showPhoneQr(){
  if(!currentShift){toast('Сначала открой смену','error');return}
  const routeId=$('saleRoute').value||currentShift.route_id||'';
- const base=location.href.split('?')[0].replace(/index\\.html?$/,'').replace(/#.*$/,'');
+ const base=location.href.split('?')[0].replace('index.html','').replace(/#.*$/,'');
  const url=base+'pay.html?shift='+encodeURIComponent(currentShift.id)+(routeId?'&route='+encodeURIComponent(routeId):'');
  showModal('<p class="eyebrow">ПОКУПКА НА ТЕЛЕФОНЕ</p><h2>QR-код для телефона</h2><p class="hint">На другом устройстве открой камеру и наведи её на этот код. Откроется форма выбора остановки и оплаты.</p><div id="phoneQr" class="phone-qr"></div><p class="hint">'+esc(url)+'</p>');
  new QRCode($('phoneQr'),{text:url,width:220,height:220,correctLevel:QRCode.CorrectLevel.M});
