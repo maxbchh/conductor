@@ -6,7 +6,7 @@ const $=id=>document.getElementById(id);
 const money=n=>Number(n||0).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' BYN';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=p=>p+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);
-let db={routes:[],vehicles:[],shifts:[],tickets:[],schedules:[],cards:[]},activeScheduleFolder=null,client=null,currentShift=null,lastTicket=null,toastTimer;
+let db={routes:[],vehicles:[],shifts:[],tickets:[],schedules:[],cards:[],cashShifts:[],news:[]},activeScheduleFolder=null,client=null,currentShift=null,currentCashShift=null,lastTicket=null,toastTimer;
 const statusOptions=['В эксплуатации','На рейсе','Не в эксплуатации','Ремонт','Капитальный ремонт','Списан','Выведен из эксплуатации'];
 function toast(s,type=''){const el=$('toast');el.textContent=s;el.className='toast show '+type;clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3000)}
 function setCloud(s,cls){$('cloudState').className='cloud-state '+cls;$('cloudState').innerHTML='<i></i> '+s}
@@ -50,12 +50,12 @@ function renderInfo(){
  $('gameClock').textContent=currentShift?.game_time||$('tripGameTime').value||'—';
  $('infoRoute').textContent=route?route.name:'—';$('infoVehicle').textContent=vehicle?(vehicle.number+' · '+vehicle.model):(currentShift?.vehicle_label||'—');
  $('infoGameTime').textContent=currentShift?.game_time||'—';if($('liveRoute'))$('liveRoute').value=currentShift?.route_id||'';if($('liveRouteControls'))$('liveRouteControls').style.display=currentShift?'grid':'none';
- const activeStops=activeTripRoute()?.stops||[],cur=Number(currentShift?.current_stop_index||0);$('infoCurrentStop').textContent=currentShift&&activeStops[cur]?activeStops[cur]:'—';$('infoNextStop').textContent=currentShift&&activeStops[cur+1]?activeStops[cur+1]:'—';$('cashContext').textContent=currentShift?(route?'Рейс '+route.name+' · ':'Смена открыта · ')+(vehicle?.number||currentShift.vehicle_label||''):'Смена не открыта';
+ const activeStops=activeTripRoute()?.stops||[],cur=Number(currentShift?.current_stop_index||0);$('infoCurrentStop').textContent=currentShift&&activeStops[cur]?activeStops[cur]:'—';$('infoNextStop').textContent=currentShift&&activeStops[cur+1]?activeStops[cur+1]:'—';$('cashContext').textContent=currentShift?(route?'Рейс '+route.name+' · ':'Водительская смена · ')+(vehicle?.number||currentShift.vehicle_label||''):'Водительская смена не открыта';if($('cashShiftStatus'))$('cashShiftStatus').textContent=currentCashShift?'Кассовая смена открыта':'Кассовая смена закрыта';if($('openCashShift'))$('openCashShift').disabled=!!currentCashShift;if($('closeCashShift'))$('closeCashShift').disabled=!currentCashShift;
  $('shiftBadge').textContent=currentShift?'Смена открыта':'Смена закрыта';$('shiftBadge').className='shift-badge '+(currentShift?'open':'closed');
  $('startShift').disabled=!!currentShift;$('endShift').disabled=!currentShift;
 }
 function renderStats(){
- const tickets=currentShift?db.tickets.filter(t=>t.shift_id===currentShift.id):[];
+ const tickets=currentCashShift?db.tickets.filter(t=>t.cash_shift_id===currentCashShift.id):[];
  $('shiftTickets').textContent=tickets.length;
  $('shiftRevenue').textContent=money(tickets.reduce((s,t)=>s+Number(t.amount||0),0));
 }
@@ -76,6 +76,8 @@ function renderTickets(){
  $('ticketCount').textContent=db.tickets.length+' билетов';
  $('ticketsList').innerHTML=rows.length?'<table><thead><tr><th>Билет</th><th>Маршрут</th><th>Откуда → Куда</th><th>Тариф</th><th>Оплата</th><th>Сумма</th></tr></thead><tbody>'+rows.map(t=>'<tr><td><b>#'+t.ticket_number+'</b><span class="subtext">'+new Date(t.issued_at).toLocaleString('ru-RU')+'</span></td><td>'+esc(t.route_name||'—')+'</td><td>'+esc(t.from_stop)+' → '+esc(t.to_stop)+'</td><td>'+esc(t.fare_type)+'</td><td>'+esc(t.payment_method==='card'?'Карта':'Наличные')+'</td><td><b>'+money(t.amount)+'</b></td></tr>').join('')+'</tbody></table>':'<div class="empty-state">Проданных билетов пока нет</div>';
 }
+async function openCashShift(){if(currentCashShift){toast('Кассовая смена уже открыта');return}const q=await client.from('conductor_cash_shifts').insert({id:uid('cash'),status:'open',opening_cash:Math.max(0,Number($('cashOpening').value)||0)}).select().single();if(q.error){toast('Не удалось открыть кассу: '+q.error.message,'error');return}currentCashShift=q.data;db.cashShifts.unshift(q.data);renderInfo();renderStats();toast('Кассовая смена открыта отдельно','success')}
+async function closeCashShift(){if(!currentCashShift)return;const q=await client.from('conductor_cash_shifts').update({status:'closed',ended_at:new Date().toISOString(),closing_cash:Math.max(0,Number($('cashClosing').value)||0)}).eq('id',currentCashShift.id).select().single();if(q.error){toast('Не удалось закрыть кассу: '+q.error.message,'error');return}db.cashShifts=db.cashShifts.map(x=>x.id===q.data.id?q.data:x);currentCashShift=null;renderInfo();renderStats();toast('Кассовая смена закрыта','success')}
 function syncTripStops(){
  const r=db.routes.find(x=>x.id===$('liveRoute')?.value);if(!r)return;
  for(const id of ['liveCurrentStop','liveEndStop']){const el=$(id);if(el)el.innerHTML=r.stops.map((s,i)=>'<option value="'+i+'">'+esc(s)+'</option>').join('')}
@@ -95,7 +97,7 @@ function ticketPrint(t){
  window.onafterprint=()=>{document.body.classList.remove('print-ticket');root.remove()};
 }
 function showPhoneQr(){
- if(!currentShift){toast('Сначала открой смену','error');return}
+ if(!currentShift||!currentCashShift){toast('Сначала открой кассовую и водительскую смены','error');return}
  const routeId=$('saleRoute').value||currentShift.route_id||'';
  const base=location.href.split('?')[0].replace('index.html','').replace(/#.*$/,'');
  const url=base+'pay.html?shift='+encodeURIComponent(currentShift.id)+(routeId?'&route='+encodeURIComponent(routeId):'');
@@ -103,7 +105,7 @@ function showPhoneQr(){
  new QRCode($('phoneQr'),{text:url,width:220,height:220,correctLevel:QRCode.CorrectLevel.M});
 }
 async function openPayment(){
- if(!currentShift){toast('Сначала открой смену в разделе «Рейсы»','error');return}
+ if(!currentCashShift){toast('Сначала открой кассовую смену в разделе «Касса»','error');return}if(!currentShift){toast('Сначала открой водительскую смену в разделе «Рейсы»','error');return}
  const x=updateFare();if(!x.valid){toast('Выбери маршрут и остановку назначения','error');return}
  if(currentShift.route_id!==x.r.id){await assignShiftRoute(x.r.id);if(currentShift.route_id!==x.r.id)return}
  const fareName=x.mult===.5?'Льготный':x.mult===.75?'Школьный':'Полный';
@@ -120,7 +122,7 @@ async function completeSale(x,method,received,cardId){
  const button=method==='cash'?$('payCash'):$('payCard');button.disabled=true;button.textContent='Проверка оплаты…';
  try{
   const fareName=x.mult===.5?'Льготный':x.mult===.75?'Школьный':'Полный';
-  const rows=Array.from({length:x.qty},()=>({shift_id:currentShift.id,route_id:x.r.id,route_name:x.r.name,from_stop:x.r.stops[x.a],to_stop:x.r.stops[x.b],stop_count:x.stops,fare_type:fareName,fare_multiplier:x.mult,fare_per_stop:x.per,amount:Number((x.stops*x.per*x.mult).toFixed(2)),payment_method:method,cash_received:method==='cash'?received/x.qty:x.total/x.qty,change_due:method==='cash'?Math.max(0,received-x.total)/x.qty:0,game_time:currentShift.game_time,card_id:cardId}));
+  const rows=Array.from({length:x.qty},()=>({shift_id:currentShift.id,cash_shift_id:currentCashShift.id,route_id:x.r.id,route_name:x.r.name,from_stop:x.r.stops[x.a],to_stop:x.r.stops[x.b],stop_count:x.stops,fare_type:fareName,fare_multiplier:x.mult,fare_per_stop:x.per,amount:Number((x.stops*x.per*x.mult).toFixed(2)),payment_method:method,cash_received:method==='cash'?received/x.qty:x.total/x.qty,change_due:method==='cash'?Math.max(0,received-x.total)/x.qty:0,game_time:currentShift.game_time,card_id:cardId}));
   let data;
   if(method==='card'){
    const charge=await client.rpc('conductor_charge_virtual_card',{p_card_id:cardId,p_ticket_rows:rows});
@@ -178,19 +180,22 @@ async function endShift(){
   db.shifts=db.shifts.map(s=>s.id===currentShift.id?q.data:s);currentShift=null;renderAll();toast('Смена завершена и сохранена');
  }catch(e){toast('Ошибка завершения смены: '+e.message)}
 }
+function renderAll(){renderRouteSelects();renderFleet();renderRoutes();renderCards();renderTickets();renderHistory();renderSchedules();renderStats();renderTripRoutes();if(typeof renderNews==='function')renderNews();}
 async function loadData(){
  setCloud('Загрузка базы…','');
- const [r,v,s,t,sch,cards]=await Promise.all([
+ const [r,v,s,t,sch,cards,cs,news]=await Promise.all([
   client.from('conductor_routes').select('*').order('city').order('name'),
   client.from('conductor_vehicles').select('*').order('city').order('number'),
   client.from('conductor_shifts').select('*').order('started_at',{ascending:false}).limit(100),
   client.from('conductor_tickets').select('*').order('ticket_number',{ascending:false}).limit(500),
   client.from('conductor_schedules').select('*').order('folder').order('title'),
-  client.from('conductor_cards').select('*').order('holder')
+  client.from('conductor_cards').select('*').order('holder'),
+  client.from('conductor_cash_shifts').select('*').order('started_at',{ascending:false}).limit(100),
+  client.from('conductor_news').select('*').order('published_at',{ascending:false}).limit(200)
  ]);
- for(const x of [r,v,s,t,sch,cards])if(x.error)throw x.error;
- db={routes:(r.data||[]).filter(x=>x.city==='Тверь'),vehicles:(v.data||[]).filter(x=>x.city==='Тверь'),shifts:s.data||[],tickets:t.data||[],schedules:sch.data||[],cards:cards.data||[]};
- currentShift=db.shifts.find(s=>s.status==='open')||null;
+ for(const [label,x] of [['маршруты',r],['подвижной состав',v],['водительские смены',s],['билеты',t],['расписания',sch],['виртуальные карты',cards],['кассовые смены',cs],['городские новости',news]])if(x.error)throw new Error(label+': '+x.error.message+' · '+(x.error.code||'без кода'));
+ db={routes:(r.data||[]).filter(x=>x.city==='Тверь'),vehicles:(v.data||[]).filter(x=>x.city==='Тверь'),shifts:s.data||[],tickets:t.data||[],schedules:sch.data||[],cards:cards.data||[],cashShifts:cs.data||[],news:news.data||[]};
+ currentShift=db.shifts.find(s=>s.status==='open')||null;currentCashShift=db.cashShifts.find(s=>s.status==='open')||null;
  if(currentShift){const active= db.shifts.filter(s=>s.status==='open');if(active.length>1){console.warn('Several open shifts detected; using newest.')}} 
  setCloud('База синхронизирована','ok');renderAll();
 }
@@ -204,7 +209,7 @@ function init(){
  $('saleRoute').onchange=()=>{updateSaleStops();if(currentShift&&$('saleRoute').value&&currentShift.route_id!==$('saleRoute').value)assignShiftRoute($('saleRoute').value)};$('saleFrom').onchange=updateFare;$('saleTo').onchange=updateFare;$('saleFare').onchange=updateFare;$('saleQty').oninput=updateFare;
  $('qtyMinus').onclick=()=>{$('saleQty').value=Math.max(1,Number($('saleQty').value)-1);updateFare()};$('qtyPlus').onclick=()=>{$('saleQty').value=Math.min(20,Number($('saleQty').value)+1);updateFare()};
  $('openPayment').onclick=openPayment;$('printTicket').onclick=()=>ticketPrint(lastTicket);$('showPhoneQr').onclick=showPhoneQr;$('addScheduleFolder').onclick=()=>{const f=prompt('Название папки маршрута, например 102:');if(!f)return;activeScheduleFolder=f.trim();editSchedule(null)};$('scheduleFolders').onclick=e=>{const b=e.target.closest('[data-folder]');if(b){activeScheduleFolder=b.dataset.folder;renderSchedules()}};$('scheduleEntries').onclick=e=>{const add=e.target.closest('#addScheduleText'),edit=e.target.closest('[data-edit-schedule]');if(add)editSchedule(null);if(edit)editSchedule(db.schedules.find(s=>s.id===edit.dataset.editSchedule))};
- $('tripCity').onchange=renderRouteSelects;$('liveRoute').onchange=()=>assignShiftRoute($('liveRoute').value);$('liveCurrentStop').onchange=async()=>{if(!currentShift)return;const i=Number($('liveCurrentStop').value);try{const q=await client.from('conductor_shifts').update({current_stop_index:i}).eq('id',currentShift.id).select().single();if(q.error)throw q.error;currentShift=q.data;db.shifts=db.shifts.map(s=>s.id===q.data.id?q.data:s);renderInfo();updateSaleStops();toast('Текущая остановка обновлена','success')}catch(e){toast('Ошибка: '+e.message)}};$('liveEndStop').onchange=async()=>{if(!currentShift)return;const i=Number($('liveEndStop').value);const q=await client.from('conductor_shifts').update({end_stop_index:i}).eq('id',currentShift.id).select().single();if(q.error){toast(q.error.message,'error');return}currentShift=q.data;toast('Конечная остановка рейса изменена','success')};$('tripGameTime').oninput=()=>{if(!currentShift)$('gameClock').textContent=$('tripGameTime').value||'—'};$('startShift').onclick=startShift;$('endShift').onclick=endShift;
+ $('tripCity').onchange=renderRouteSelects;$('liveRoute').onchange=()=>assignShiftRoute($('liveRoute').value);$('liveCurrentStop').onchange=async()=>{if(!currentShift)return;const i=Number($('liveCurrentStop').value);try{const q=await client.from('conductor_shifts').update({current_stop_index:i}).eq('id',currentShift.id).select().single();if(q.error)throw q.error;currentShift=q.data;db.shifts=db.shifts.map(s=>s.id===q.data.id?q.data:s);renderInfo();updateSaleStops();toast('Текущая остановка обновлена','success')}catch(e){toast('Ошибка: '+e.message)}};$('liveEndStop').onchange=async()=>{if(!currentShift)return;const i=Number($('liveEndStop').value);const q=await client.from('conductor_shifts').update({end_stop_index:i}).eq('id',currentShift.id).select().single();if(q.error){toast(q.error.message,'error');return}currentShift=q.data;toast('Конечная остановка рейса изменена','success')};$('tripGameTime').oninput=()=>{if(!currentShift)$('gameClock').textContent=$('tripGameTime').value||'—'};$('startShift').onclick=startShift;$('endShift').onclick=endShift;$('openCashShift').onclick=openCashShift;$('closeCashShift').onclick=closeCashShift;
  $('dbCity').onchange=renderFleet;$('fleetSearch').oninput=renderFleet;$('routesCity').onchange=renderRoutes;
  $('addCard').onclick=()=>openCardEditor(null);$('cardsList').onclick=e=>{const b=e.target.closest('[data-edit-card]');if(b)openCardEditor(db.cards.find(c=>c.id===b.dataset.editCard))};$('addVehicle').onclick=()=>openVehicleEditor(null);$('addRoute').onclick=()=>openRouteEditor(null);$('tripAddRoute').onclick=()=>openRouteEditor(null);$('tripRoutesList').onclick=e=>{const ed=e.target.closest('[data-trip-edit-route]'),sel=e.target.closest('[data-trip-select-route]');if(ed)openRouteEditor(db.routes.find(r=>r.id===ed.dataset.tripEditRoute));if(sel)assignShiftRoute(sel.dataset.tripSelectRoute)};
  $('fleetList').onclick=e=>{const b=e.target.closest('[data-edit-vehicle]');if(b)openVehicleEditor(db.vehicles.find(v=>v.id===b.dataset.editVehicle))};
@@ -214,6 +219,6 @@ function init(){
 document.addEventListener('DOMContentLoaded',async()=>{
  init();
  try{if(!window.supabase)throw new Error('Supabase SDK не загрузился');client=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false}});await loadData()}
- catch(e){console.error(e);setCloud('Нет соединения с базой','error');toast('Не удалось загрузить базу: '+e.message)}
+ catch(e){console.error('Conductor startup error',e);setCloud('Ошибка запуска','error');toast('Ошибка запуска: '+(e.message||String(e)),'error')}
 });
 })();
