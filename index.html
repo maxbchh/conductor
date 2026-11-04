@@ -12,9 +12,18 @@
 <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
 <header class="topbar glass">
  <a class="brand" href="#"><span class="brand-mark">C</span><span><b>Conductor</b><small>Кассовая система</small></span></a>
- <div class="clock-group"><div><small>ОБЫЧНОЕ ВРЕМЯ</small><b id="realClock">--:--:--</b></div><i></i><div><small>ИГРОВОЕ ВРЕМЯ</small><b id="gameClock">--:--</b></div></div>
+ <div class="clock-group"><div><small>ОБЫЧНОЕ ВРЕМЯ</small><b id="realClock">--:--:--</b></div><i></i><div><small>ИГРОВОЕ ВРЕМЯ</small><b id="gameClock">--:--:--</b><small id="gameDate" class="game-clock-date">--.--.----</small></div></div>
  <div class="top-actions"><span id="cloudState" class="cloud-state"><i></i> Подключение…</span><span id="shiftBadge" class="shift-badge closed">Смена закрыта</span></div>
 </header>
+<section class="game-clock-panel glass" aria-label="Управление игровым временем">
+ <div class="game-clock-status"><span id="gameClockDot" class="game-clock-dot"></span><div><small>УПРАВЛЕНИЕ ИГРОВЫМ ВРЕМЕНЕМ</small><b id="gameClockStatus">Подключение часов…</b></div></div>
+ <div class="game-clock-actions">
+  <button id="gameClockPause" class="secondary-btn compact" type="button" disabled>Ⅱ Пауза</button>
+  <label class="game-clock-rate"><span>Скорость</span><select id="gameClockRate" disabled><option value="0.25">0,25×</option><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select></label>
+  <div class="game-clock-jumps"><button id="gameClockBackHour" class="secondary-btn compact" type="button" disabled>−1 ч</button><button id="gameClockBack15" class="secondary-btn compact" type="button" disabled>−15 мин</button><button id="gameClockForward15" class="secondary-btn compact" type="button" disabled>+15 мин</button><button id="gameClockForwardHour" class="secondary-btn compact" type="button" disabled>+1 ч</button></div>
+ </div>
+ <div class="game-clock-manual"><label><span>Установить дату и время вручную</span><input id="gameClockManual" type="datetime-local" step="1" disabled></label><button id="gameClockSet" class="primary-btn compact" type="button" disabled>Установить</button></div>
+</section>
 <nav class="tabs glass">
  <button class="tab active" data-tab="cash"><span>▦</span> Касса</button>
  <button class="tab" data-tab="trips"><span>↗</span> Рейсы</button>
@@ -54,7 +63,7 @@
    <label class="field"><span>Город / парк</span><select id="tripCity"><option>Тверь</option></select></label>
    
    <label class="field"><span>Подвижной состав</span><select id="tripVehicle"></select></label>
-   <label class="field"><span>Игровое время</span><input id="tripGameTime" type="time" value="08:00"></label><label class="field full"><span>Автобус вручную (если его нет в базе)</span><input id="tripManualVehicle" placeholder="Например: МАЗ 103 · борт 102"></label>
+   <label class="field"><span>Время при открытии рейса</span><input id="tripGameTime" type="time" value="08:00" readonly></label><label class="field full"><span>Автобус вручную (если его нет в базе)</span><input id="tripManualVehicle" placeholder="Например: МАЗ 103 · борт 102"></label>
   </div>
   <div class="trip-actions"><button id="startShift" class="primary-btn" type="button">Открыть рейс →</button><button id="tripNextStop" class="secondary-btn" type="button" disabled>Следующая остановка →</button><button id="endShift" class="danger-btn" type="button" disabled>Завершить рейс</button></div>
   <div id="liveRouteControls" class="field-grid"><label class="field"><span>Маршрут текущего рейса</span><select id="liveRoute"></select></label><label class="field"><span>Текущая остановка</span><select id="liveCurrentStop"></select></label><label class="field"><span>Конец рейса (любая остановка)</span><select id="liveEndStop"></select></label><div id="liveRouteSummary" class="route-summary">Выбери маршрут — появятся начальная и конечная остановки</div></div><p class="hint">Рейс управляет подвижным составом и текущей остановкой. Для продажи билетов достаточно открытой кассовой смены.</p>
