@@ -2,13 +2,13 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#edf2fa"><title>Conductor · Покупка билета</title>
+<meta name="theme-color" content="#edf2fa"><title>Кондуктор · Покупка билета</title>
 <link rel="stylesheet" href="./styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
-<header class="topbar glass"><a class="brand" href="./"><span class="brand-mark">C</span><span><b>Conductor</b><small>Покупка билета</small></span></a><span class="shift-badge open" id="payStatus">Подключение…</span></header>
+<header class="topbar glass"><a class="brand" href="./"><span class="brand-mark">К</span><span><b>Кондуктор</b><small>Покупка билета</small></span></a><span class="shift-badge open" id="payStatus">Подключение…</span></header>
 <main class="phone-pay-main">
  <div class="page-heading"><div><p class="eyebrow">БИЛЕТ ПО QR-КОДУ</p><h1>Выбор поездки</h1><p class="muted">Выбери маршрут, остановку назначения и способ оплаты</p></div></div>
  <section class="glass panel phone-pay-panel">
@@ -21,8 +21,8 @@
   </div>
   <div class="fare-summary"><div><small>Остановок</small><b id="payStops">—</b></div><div><small>За остановку</small><b id="payPer">—</b></div><div class="sum"><small>Итого</small><b id="payTotal">0,00 BYN</b></div></div>
   <section class="virtual-bank-panel">
-   <div class="virtual-bank-heading"><div><p class="eyebrow">CONDUCTOR · VIRTUAL BANK</p><h2>Виртуальный банк</h2><p>Игровые карты и баланс</p></div><span class="bank-sim-badge">ТОЛЬКО СИМУЛЯЦИЯ</span></div>
-   <div id="bankCardPreview" class="virtual-bank-card blue"><div class="bank-card-top"><b id="bankCardBank">Conductor Bank</b><span>CONDUCTOR · SIM</span></div><div id="bankCardNumber" class="bank-card-number">9900 0000 0000 0000</div><div class="bank-card-bottom"><div><small>ВЛАДЕЛЕЦ</small><b id="bankCardHolder">Виртуальная карта</b></div><div><small>БАЛАНС</small><b id="bankCardBalance">0,00 BYN</b></div></div></div>
+   <div class="virtual-bank-heading"><div><p class="eyebrow">ВИРТУАЛЬНЫЙ БАНК</p><h2>Виртуальный банк</h2><p>Игровые карты и баланс</p></div><span class="bank-sim-badge">ТОЛЬКО СИМУЛЯЦИЯ</span></div>
+   <div id="bankCardPreview" class="virtual-bank-card blue"><div class="bank-card-top"><b id="bankCardBank">Банк «Кондуктор»</b><span>КОНДУКТОР · ИГРА</span></div><div id="bankCardNumber" class="bank-card-number">9900 0000 0000 0000</div><div class="bank-card-bottom"><div><small>ВЛАДЕЛЕЦ</small><b id="bankCardHolder">Виртуальная карта</b></div><div><small>БАЛАНС</small><b id="bankCardBalance">0,00 BYN</b></div></div></div>
    <div class="bank-select-row"><label class="field"><span>Выбрать карту</span><select id="payCard"><option value="">Загрузка карт…</option></select></label><button id="payRandomCard" class="secondary-btn" type="button">↻ Случайная карта</button></div>
    <div class="bank-actions"><label class="field"><span>Сумма операции (BYN)</span><input id="bankAmount" type="number" min="0.01" step=".01" placeholder="Например, 20.00"></label><button id="bankTopUp" class="secondary-btn" type="button" disabled>＋ Пополнить</button><button id="bankWithdraw" class="secondary-btn" type="button" disabled>− Списать</button><button id="bankEmpty" class="danger-btn" type="button" disabled>Обнулить</button></div>
    <button id="toggleCreateCard" class="bank-create-toggle" type="button">＋ Выпустить новую виртуальную карту</button>
@@ -30,7 +30,7 @@
     <div class="field-grid">
      <label class="field"><span>Владелец</span><input id="newCardHolder" maxlength="80" placeholder="Имя владельца"></label>
      <label class="field"><span>Название карты</span><input id="newCardLabel" maxlength="80" value="Моя карта"></label>
-     <label class="field full"><span>Название виртуального банка</span><input id="newCardBank" maxlength="50" value="Conductor Bank"></label>
+     <label class="field full"><span>Название виртуального банка</span><input id="newCardBank" maxlength="50" value="Банк «Кондуктор»"></label>
      <label class="field full"><span>Свой выдуманный номер · 16 цифр</span><input id="newCardNumber" inputmode="numeric" autocomplete="off" maxlength="16" placeholder="Оставь пустым для случайного номера"></label>
      <label class="field"><span>Тип карты</span><select id="newCardType"><option>Классическая</option><option>Транспортная</option><option>Премиальная</option><option>Молодёжная</option></select></label>
      <label class="field"><span>Дизайн карты</span><select id="newCardColor"><option value="blue">Синий</option><option value="violet">Фиолетовый</option><option value="green">Зелёный</option><option value="dark">Тёмный</option></select></label>
@@ -38,13 +38,13 @@
     </div><button id="createBankCard" class="primary-btn" type="button">Выпустить карту</button>
    </div>
    <div class="bank-history"><div class="bank-history-title"><b>Последние операции</b><span>История выбранной карты</span></div><div id="bankCardHistory"><div class="empty-state">Выбери карту, чтобы увидеть операции</div></div></div>
-   <p class="hint">Все карты, номера и операции вымышленные и существуют только внутри Conductor. Не вводи номера, сроки действия или коды настоящих банковских карт.</p>
+   <p class="hint">Все карты, номера и операции вымышленные и существуют только внутри системы «Кондуктор». Не вводи номера, сроки действия или коды настоящих банковских карт.</p>
   </section>
   <div class="payment-methods"><button id="payCash" class="primary-btn" type="button">Наличными</button><button id="payByCard" class="secondary-btn" type="button">Оплатить виртуальной картой</button></div>
-  <p class="hint">Виртуальная карта — игровая симуляция с балансом из базы Conductor. Это не банковская карта и не настоящий платёж.</p>
+  <p class="hint">Виртуальная карта — игровая симуляция с балансом из базы «Кондуктор». Это не банковская карта и не настоящий платёж.</p>
   <div id="payResult" class="pay-result" aria-live="polite"></div>
  </section>
- <p class="hint phone-pay-foot"><a href="./">Вернуться в кассу Conductor</a></p>
+ <p class="hint phone-pay-foot"><a href="./">Вернуться в кассу «Кондуктор»</a></p>
 </main>
 <div id="payToast" class="toast"></div>
 <script>
@@ -64,7 +64,7 @@ function fill(el,items,placeholder){el.innerHTML='<option value="">'+placeholder
  function renderBank(){
   const c=selectedCard(),preview=$('bankCardPreview');
   preview.className='virtual-bank-card '+(['blue','violet','green','dark'].includes(c?.card_color)?c.card_color:'blue');
-  $('bankCardBank').textContent=c?.bank_name||'Conductor Bank';
+  $('bankCardBank').textContent=c?.bank_name||'Банк «Кондуктор»';
   $('bankCardNumber').textContent=c?displayCardNumber(c.card_number):'ВЫБЕРИ ВИРТУАЛЬНУЮ КАРТУ';
   $('bankCardHolder').textContent=c?.holder||'Виртуальная карта';
   $('bankCardBalance').textContent=money(c?.balance||0);
@@ -77,7 +77,7 @@ function fill(el,items,placeholder){el.innerHTML='<option value="">'+placeholder
  }
  function refillCardSelector(preferredId){
   const current=preferredId||$('payCard').value;
-  fill($('payCard'),cards.map(c=>({value:c.id,label:(c.bank_name||'Conductor Bank')+' · '+(c.label||'Карта')+' · ••'+String(c.card_number||'').slice(-4)+' · '+money(c.balance)})),'Выбери виртуальную карту');
+  fill($('payCard'),cards.map(c=>({value:c.id,label:(c.bank_name||'Банк «Кондуктор»')+' · '+(c.label||'Карта')+' · ••'+String(c.card_number||'').slice(-4)+' · '+money(c.balance)})),'Выбери виртуальную карту');
   if(cards.some(c=>c.id===current))$('payCard').value=current;
   renderBank();
  }
@@ -96,7 +96,7 @@ function fill(el,items,placeholder){el.innerHTML='<option value="">'+placeholder
   }catch(e){toast('Ошибка виртуального банка: '+e.message,'error')}
  }
  async function createBankCard(){
-  const holder=$('newCardHolder').value.trim(),label=$('newCardLabel').value.trim()||'Моя карта',bank=$('newCardBank').value.trim()||'Conductor Bank';
+  const holder=$('newCardHolder').value.trim(),label=$('newCardLabel').value.trim()||'Моя карта',bank=$('newCardBank').value.trim()||'Банк «Кондуктор»';
   const number=$('newCardNumber').value.trim()||randomVirtualCardNumber(),initial=Math.max(0,Number($('newCardInitial').value)||0);
   if(!holder){toast('Укажи владельца карты','error');return}
   if(!/^\d{16}$/.test(number)){toast('Номер должен содержать ровно 16 цифр','error');return}
