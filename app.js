@@ -17,24 +17,18 @@ function activeVehicle(){return currentShift?db.vehicles.find(v=>v.id===currentS
 function activeTripRoute(){return currentShift?db.routes.find(r=>r.id===currentShift.route_id):null}
 function fillSelect(el,items,placeholder){el.innerHTML=placeholder?'<option value="">'+esc(placeholder)+'</option>':'';items.forEach(x=>{const o=document.createElement('option');o.value=x.value;o.textContent=x.label;el.appendChild(o)})}
 function renderRouteSelects(){
- const city=$('tripCity').value||'Тверь';
- const routes=db.routes.filter(r=>r.city===city);
- const opts=routes.map(r=>({value:r.id,label:r.name+' · '+r.city}));
- const previous=$('tripRoute').value;fillSelect($('tripRoute'),opts,'Выберите маршрут');if(routes.some(r=>r.id===previous))$('tripRoute').value=previous;
- const saleOpts=db.routes.filter(r=>r.city==='Тверь').map(r=>({value:r.id,label:r.name}));
- const old=$('saleRoute').value;fillSelect($('saleRoute'),saleOpts,'Выберите маршрут');if(currentShift&&currentShift.route_id&&db.routes.some(r=>r.id===currentShift.route_id))$('saleRoute').value=currentShift.route_id;else if(db.routes.some(r=>r.id===old))$('saleRoute').value=old;
+ const routes=db.routes.filter(r=>r.city==='Тверь'),opts=routes.map(r=>({value:r.id,label:r.name})),old=$('saleRoute').value;
+ fillSelect($('saleRoute'),opts,'Выберите маршрут');
+ const chosen=currentShift?.route_id||old;if(chosen&&routes.some(r=>r.id===chosen))$('saleRoute').value=chosen;
  updateSaleStops();renderVehicleSelect();renderInfo();
 }
 function updateSaleStops(){
- const r=activeRoute(),from=$('saleFrom'),to=$('saleTo');
- const oldFrom=from.value,oldTo=to.value;
- const start=currentShift?Number(currentShift.current_stop_index||0):(oldFrom!==''?Number(oldFrom):0);
- fillSelect(from,(r?.stops||[]).map((s,i)=>({value:String(i),label:s})),'Выберите остановку');
- fillSelect(to,(r?.stops||[]).map((s,i)=>({value:String(i),label:s})).filter(x=>Number(x.value)>start),'Выберите остановку');
- if(r&&start>=0&&start<r.stops.length)from.value=String(start);
+ const r=activeRoute(),from=$('saleFrom'),to=$('saleTo'),oldTo=to.value,start=currentShift?Number(currentShift.current_stop_index||0):0;
+ fillSelect(from,(r?.stops||[]).map((s,i)=>({value:String(i),label:s})),'Остановка отправления');
+ fillSelect(to,(r?.stops||[]).map((s,i)=>({value:String(i),label:s})).filter(x=>Number(x.value)>start),'Остановка назначения');
+ if(r&&start<r.stops.length)from.value=String(start);
  if(r&&oldTo!==''&&Number(oldTo)>start)to.value=oldTo;
- from.disabled=!!currentShift;
- updateFare();
+ from.disabled=!!currentShift;updateFare();
 }
 function updateFare(){
  const r=activeRoute(),a=Number($('saleFrom').value),b=Number($('saleTo').value),valid=!!r&&Number.isInteger(a)&&Number.isInteger(b)&&b>a;
@@ -160,19 +154,31 @@ function openVehicleEditor(v){
 }
 function openRouteEditor(r){
  const edit=!!r;
- showModal('<p class="eyebrow">МАРШРУТНАЯ СЕТЬ</p><h2>'+(edit?'Изменить маршрут':'Новый маршрут')+'</h2><div class="field-grid"><label class="field"><span>Номер / название</span><input id="rName" value="'+esc(r?.name||'')+'"></label><label class="field"><span>Город</span><select id="rCity"><option '+((r?.city||$('routesCity').value)==='Тверь'?'selected':'')+'>Тверь</option><option '+((r?.city||$('routesCity').value)==='Новоозёрск'?'selected':'')+'>Новоозёрск</option></select></label><label class="field full"><span>Остановки по порядку — каждая с новой строки</span><textarea id="rStops" rows="7">'+esc((r?.stops||[]).join('\n'))+'</textarea></label><label class="field"><span>Цена за одну остановку (BYN)</span><input id="rFare" type="number" min="0" step=".01" value="'+esc(r?.fare_per_stop??.5)+'"></label></div><div class="modal-actions"><button id="saveRoute" class="primary-btn">Сохранить маршрут</button></div>');
- $('saveRoute').onclick=async()=>{const payload={name:$('rName').value.trim(),city:$('rCity').value,stops:$('rStops').value.split('\n').map(s=>s.trim()).filter(Boolean),fare_per_stop:Math.max(0,Number($('rFare').value)||0)};if(!payload.name||payload.stops.length<2){toast('Нужно название и минимум две остановки');return}try{let q;if(edit)q=await client.from('conductor_routes').update(payload).eq('id',r.id).select().single();else q=await client.from('conductor_routes').insert({...payload,id:uid('route')}).select().single();if(q.error)throw q.error;if(edit)db.routes=db.routes.map(x=>x.id===r.id?q.data:x);else db.routes.push(q.data);closeModal();$('tripRoute').value=q.data.id;$('saleRoute').value=q.data.id;renderAll();syncTripStops();updateSaleStops();toast('Маршрут сохранён и выбран')}catch(e){toast('Ошибка сохранения: '+e.message)}};
+ showModal('<p class="eyebrow">МАРШРУТНАЯ СЕТЬ</p><h2>'+(edit?'Изменить маршрут':'Новый маршрут')+'</h2><div class="field-grid"><label class="field full"><span>Номер / название маршрута</span><input id="rName" value="'+esc(r?.name||'')+'"></label><label class="field full"><span>Остановки по порядку — через точку с запятой</span><textarea id="rStops" rows="7" placeholder="Речной вокзал; Третьяковск; Ивановск; Тетрис">'+esc((r?.stops||[]).join('; '))+'</textarea></label><label class="field"><span>Цена за одну остановку (BYN)</span><input id="rFare" type="number" min="0" step=".01" value="'+esc(r?.fare_per_stop??.5)+'"></label></div><div class="modal-actions"><button id="saveRoute" class="primary-btn">Сохранить маршрут</button></div>');
+ $('saveRoute').onclick=async()=>{
+  const stops=$('rStops').value.split(/[;\n]+/).map(s=>s.trim()).filter(Boolean),payload={name:$('rName').value.trim(),city:'Тверь',stops,fare_per_stop:Math.max(0,Number($('rFare').value)||0)};
+  if(!payload.name||stops.length<2){toast('Укажи маршрут и минимум две остановки','error');return}
+  try{const q=edit?await client.from('conductor_routes').update(payload).eq('id',r.id).select().single():await client.from('conductor_routes').insert({...payload,id:uid('route')}).select().single();if(q.error)throw q.error;if(edit)db.routes=db.routes.map(x=>x.id===r.id?q.data:x);else db.routes.push(q.data);closeModal();renderAll();if(currentShift)await assignShiftRoute(q.data.id);else{$('saleRoute').value=q.data.id;updateSaleStops()}toast('Маршрут сохранён')}catch(e){toast('Ошибка сохранения: '+e.message,'error')}
+ };
 }
 async function startShift(){
  if(currentShift){toast('Смена уже открыта');return}
- const route=db.routes.find(r=>r.id===$('tripRoute').value),vehicle=db.vehicles.find(v=>v.id===$('tripVehicle').value);
- if(!route||!vehicle){toast('Выбери маршрут и подвижной состав');return}
- const gameTime=$('tripGameTime').value||'08:00';const startIndex=Number($('tripCurrentStop').value||0),endIndex=Number($('tripEndStop').value||route.stops.length-1);if(endIndex<=startIndex){toast('Конечная остановка должна быть после начальной');return}
+ const vehicle=db.vehicles.find(v=>v.id===$('tripVehicle').value),manual=$('tripManualVehicle').value.trim();
+ if(!vehicle&&!manual){toast('Выбери автобус из базы или впиши его вручную','error');return}
  try{
-  const {data,error}=await client.from('conductor_shifts').insert({id:uid('shift'),route_id:route.id,vehicle_id:vehicle.id,game_time:gameTime,status:'open',started_at:new Date().toISOString(),previous_vehicle_status:vehicle.status,current_stop_index:startIndex,end_stop_index:endIndex}).select().single();if(error)throw error;
-  const upd=await client.from('conductor_vehicles').update({status:'На рейсе',previous_status:vehicle.status}).eq('id',vehicle.id).select().single();if(upd.error){await client.from('conductor_shifts').delete().eq('id',data.id);throw upd.error}
-  Object.assign(vehicle,upd.data);currentShift=data;db.shifts.unshift(data);renderAll();toast('Смена открыта · рейс '+route.name);
- }catch(e){toast('Не удалось открыть смену: '+e.message)}
+  const payload={id:uid('shift'),route_id:null,vehicle_id:vehicle?.id||null,vehicle_label:vehicle?null:manual,game_time:$('tripGameTime').value||'08:00',status:'open',started_at:new Date().toISOString(),previous_vehicle_status:vehicle?.status||null,current_stop_index:0,end_stop_index:null};
+  const q=await client.from('conductor_shifts').insert(payload).select().single();if(q.error)throw q.error;
+  if(vehicle){const upd=await client.from('conductor_vehicles').update({status:'На рейсе',previous_status:vehicle.status}).eq('id',vehicle.id).select().single();if(upd.error){await client.from('conductor_shifts').delete().eq('id',q.data.id);throw upd.error}Object.assign(vehicle,upd.data)}
+  currentShift=q.data;db.shifts.unshift(q.data);renderAll();toast('Смена открыта. Теперь выбери маршрут.');
+ }catch(e){toast('Не удалось открыть смену: '+e.message,'error')}
+}
+async function assignShiftRoute(routeId){
+ if(!currentShift){toast('Сначала открой смену','error');return}
+ const route=db.routes.find(r=>r.id===routeId);if(!route)return;
+ const patch={route_id:route.id,current_stop_index:Math.min(Number(currentShift.current_stop_index||0),route.stops.length-1),end_stop_index:route.stops.length-1};
+ const q=await client.from('conductor_shifts').update(patch).eq('id',currentShift.id).select().single();
+ if(q.error){toast('Не удалось назначить маршрут: '+q.error.message,'error');return}
+ currentShift=q.data;db.shifts=db.shifts.map(s=>s.id===q.data.id?q.data:s);$('saleRoute').value=route.id;$('liveRoute').value=route.id;syncTripStops();updateSaleStops();renderInfo();renderHistory();toast('Рейс '+route.name+' назначен');
 }
 async function endShift(){
  if(!currentShift)return;
