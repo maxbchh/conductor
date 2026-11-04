@@ -6,10 +6,51 @@ const $=id=>document.getElementById(id);
 const money=n=>Number(n||0).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' BYN';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=p=>p+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);
-let db={routes:[],vehicles:[],shifts:[],tickets:[],schedules:[],cards:[],cashShifts:[],news:[]},activeScheduleFolder=null,client=null,currentShift=null,currentCashShift=null,lastTicket=null,lastTickets=[],toastTimer,realtimeChannel=null,realtimeRefreshTimer=null,realtimeLoading=false;
+let db={routes:[],vehicles:[],shifts:[],tickets:[],schedules:[],cards:[],cashShifts:[],news:[]},activeScheduleFolder=null,client=null,currentShift=null,currentCashShift=null,lastTicket=null,lastTickets=[],toastTimer,realtimeChannel=null,realtimeRefreshTimer=null,realtimeLoading=false,gameClockState=null,gameClockSaving=false;
 const statusOptions=['В эксплуатации','На рейсе','Не в эксплуатации','Ремонт','Капитальный ремонт','Списан','Выведен из эксплуатации'];
 function toast(s,type=''){const el=$('toast');el.textContent=s;el.className='toast show '+type;clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3000)}
 function setCloud(s,cls){$('cloudState').className='cloud-state '+cls;$('cloudState').innerHTML='<i></i> '+s}
+
+function getGameClockMs(){
+ if(!gameClockState)return Date.now();
+ const base=Date.parse(gameClockState.base_time),updated=Date.parse(gameClockState.updated_at);
+ if(!Number.isFinite(base))return Date.now();
+ const elapsed=gameClockState.is_paused?0:Math.max(0,Date.now()-(Number.isFinite(updated)?updated:Date.now()))*Number(gameClockState.rate||1);
+ return base+elapsed;
+}
+function formatGameTimeOnly(ms=getGameClockMs()){return new Date(ms).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}
+function formatGameDateTime(ms=getGameClockMs()){return new Date(ms).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+function gameClockInputValue(ms){const d=new Date(ms),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds())}
+function renderGameClock(){
+ const ms=getGameClockMs(),d=new Date(ms),clock=$('gameClock'),date=$('gameDate'),paused=!!gameClockState?.is_paused,rate=Number(gameClockState?.rate||1);
+ if(clock)clock.textContent=gameClockState?d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'--:--:--';
+ if(date)date.textContent=gameClockState?d.toLocaleDateString('ru-RU',{day:'2-digit',month:'long',year:'numeric'}):'--.--.----';
+ if($('gameClockStatus'))$('gameClockStatus').textContent=!gameClockState?'Часы не загружены':paused?'Игровое время остановлено':'Игровое время идёт · '+rate+'×';
+ if($('gameClockDot'))$('gameClockDot').classList.toggle('paused',paused);
+ if($('gameClockPause'))$('gameClockPause').textContent=paused?'▶ Продолжить':'Ⅱ Пауза';
+ if($('gameClockRate')&&document.activeElement!==$('gameClockRate'))$('gameClockRate').value=String(rate);
+ if($('gameClockManual')&&document.activeElement!==$('gameClockManual')&&gameClockState)$('gameClockManual').value=gameClockInputValue(ms);
+ const ids=['gameClockPause','gameClockRate','gameClockBackHour','gameClockBack15','gameClockForward15','gameClockForwardHour','gameClockManual','gameClockSet'];
+ ids.forEach(id=>{const el=$(id);if(el)el.disabled=!gameClockState||gameClockSaving});
+ if(!currentShift&&$('tripGameTime')&&gameClockState&&document.activeElement!==$('tripGameTime'))$('tripGameTime').value=formatGameTimeOnly(ms);
+}
+async function persistGameClock(baseMs,rate,paused){
+ if(!client||!gameClockState||gameClockSaving)return false;
+ if(!Number.isFinite(baseMs)||!Number.isFinite(Number(rate))||Number(rate)<=0)return false;
+ gameClockSaving=true;renderGameClock();
+ try{
+  const now=new Date().toISOString(),payload={id:'main',base_time:new Date(baseMs).toISOString(),updated_at:now,rate:Number(rate),is_paused:!!paused};
+  const q=await client.from('conductor_game_clock').upsert(payload,{onConflict:'id'}).select().single();
+  if(q.error)throw q.error;
+  gameClockState=q.data;return true;
+ }catch(e){toast('Не удалось изменить игровое время: '+(e.message||String(e)),'error');return false}
+ finally{gameClockSaving=false;renderGameClock()}
+}
+async function toggleGameClockPause(){if(!gameClockState)return;await persistGameClock(getGameClockMs(),gameClockState.rate,!gameClockState.is_paused)}
+async function changeGameClockRate(value){if(!gameClockState)return;const rate=Number(value);if(![.25,.5,1,2,4,8,16].includes(rate)){toast('Недопустимая скорость игрового времени','error');renderGameClock();return}await persistGameClock(getGameClockMs(),rate,gameClockState.is_paused)}
+async function jumpGameClock(minutes){if(!gameClockState)return;await persistGameClock(getGameClockMs()+minutes*60000,gameClockState.rate,gameClockState.is_paused)}
+async function setGameClockManually(){if(!gameClockState)return;const value=$('gameClockManual').value,ms=Date.parse(value);if(!value||!Number.isFinite(ms)){toast('Укажи корректные дату и время','error');return}const ok=await persistGameClock(ms,gameClockState.rate,gameClockState.is_paused);if(ok)toast('Игровое время установлено','success')}
+
 function showModal(html){$('modalContent').innerHTML=html;$('modalLayer').classList.add('open');$('modalLayer').setAttribute('aria-hidden','false')}
 function closeModal(){$('modalLayer').classList.remove('open');$('modalLayer').setAttribute('aria-hidden','true')}
 function activeRoute(){return db.routes.find(r=>r.id===$('saleRoute').value)||null}
@@ -122,7 +163,7 @@ async function completeSale(x,method,received,cardId){
  const button=method==='cash'?$('payCash'):$('payCard');button.disabled=true;button.textContent='Проверка оплаты…';
  try{
   const fareName=x.mult===.5?'Льготный':x.mult===.75?'Школьный':'Полный';
-  const rows=Array.from({length:x.qty},()=>({shift_id:currentShift?.id||null,cash_shift_id:currentCashShift.id,route_id:x.r.id,route_name:x.r.name,from_stop:x.r.stops[x.a],to_stop:x.r.stops[x.b],stop_count:x.stops,fare_type:fareName,fare_multiplier:x.mult,fare_per_stop:x.per,amount:Number((x.stops*x.per*x.mult).toFixed(2)),payment_method:method,cash_received:method==='cash'?received/x.qty:x.total/x.qty,change_due:method==='cash'?Math.max(0,received-x.total)/x.qty:0,game_time:currentShift?.game_time||null,card_id:cardId}));
+  const rows=Array.from({length:x.qty},()=>({shift_id:currentShift?.id||null,cash_shift_id:currentCashShift.id,route_id:x.r.id,route_name:x.r.name,from_stop:x.r.stops[x.a],to_stop:x.r.stops[x.b],stop_count:x.stops,fare_type:fareName,fare_multiplier:x.mult,fare_per_stop:x.per,amount:Number((x.stops*x.per*x.mult).toFixed(2)),payment_method:method,cash_received:method==='cash'?received/x.qty:x.total/x.qty,change_due:method==='cash'?Math.max(0,received-x.total)/x.qty:0,game_time:formatGameDateTime(getGameClockMs()),card_id:cardId}));
   let data;
   if(method==='card'){
    const charge=await client.rpc('conductor_charge_virtual_card',{p_card_id:cardId,p_ticket_rows:rows});
@@ -157,7 +198,7 @@ async function startShift(){
  const vehicle=db.vehicles.find(v=>v.id===$('tripVehicle').value),manual=$('tripManualVehicle').value.trim();
  if(!vehicle&&!manual){toast('Выбери автобус из базы или впиши его вручную','error');return}
  try{
-  const payload={id:uid('shift'),route_id:null,vehicle_id:vehicle?.id||null,vehicle_label:vehicle?null:manual,game_time:$('tripGameTime').value||'08:00',status:'open',started_at:new Date().toISOString(),previous_vehicle_status:vehicle?.status||null,current_stop_index:0,end_stop_index:null};
+  const payload={id:uid('shift'),route_id:null,vehicle_id:vehicle?.id||null,vehicle_label:vehicle?null:manual,game_time:formatGameTimeOnly(getGameClockMs()),status:'open',started_at:new Date().toISOString(),previous_vehicle_status:vehicle?.status||null,current_stop_index:0,end_stop_index:null};
   const q=await client.from('conductor_shifts').insert(payload).select().single();if(q.error)throw q.error;
   if(vehicle){const upd=await client.from('conductor_vehicles').update({status:'На рейсе',previous_status:vehicle.status}).eq('id',vehicle.id).select().single();if(upd.error){await client.from('conductor_shifts').delete().eq('id',q.data.id);throw upd.error}Object.assign(vehicle,upd.data)}
   currentShift=q.data;db.shifts.unshift(q.data);renderAll();toast('Смена открыта. Теперь выбери маршрут.');
@@ -194,7 +235,7 @@ function renderAll(){renderRouteSelects();renderFleet();renderRoutes();renderCar
 async function fetchAllTickets(){const all=[];let start=0;const pageSize=1000;while(true){const q=await client.from('conductor_tickets').select('*').order('ticket_number',{ascending:false}).range(start,start+pageSize-1);if(q.error)throw q.error;const rows=q.data||[];all.push(...rows);if(rows.length<pageSize)break;start+=pageSize;}return all;}
 async function loadData(){
  setCloud('Загрузка базы…','');
- const [r,v,s,t,sch,cards,cs,news]=await Promise.all([
+ const [r,v,s,t,sch,cards,cs,news,gc]=await Promise.all([
   client.from('conductor_routes').select('*').order('city').order('name'),
   client.from('conductor_vehicles').select('*').order('city').order('number'),
   client.from('conductor_shifts').select('*').order('started_at',{ascending:false}).limit(100),
@@ -202,26 +243,26 @@ async function loadData(){
   client.from('conductor_schedules').select('*').order('folder').order('title'),
   client.from('conductor_cards').select('*').order('holder'),
   client.from('conductor_cash_shifts').select('*').order('started_at',{ascending:false}).limit(100),
-  client.from('conductor_news').select('*').order('published_at',{ascending:false}).limit(200)
- ]);
- for(const [label,x] of [['маршруты',r],['подвижной состав',v],['водительские смены',s],['расписания',sch],['виртуальные карты',cards],['кассовые смены',cs],['городские новости',news]])if(x.error)throw new Error(label+': '+x.error.message+' · '+(x.error.code||'без кода'));
+  client.from('conductor_news').select('*').order('published_at',{ascending:false}).limit(200),
+   client.from('conductor_game_clock').select('*').eq('id','main').maybeSingle()
+  ]);
+ for(const [label,x] of [['маршруты',r],['подвижной состав',v],['водительские смены',s],['расписания',sch],['виртуальные карты',cards],['кассовые смены',cs],['городские новости',news],['игровые часы',gc]])if(x.error)throw new Error(label+': '+x.error.message+' · '+(x.error.code||'без кода'));
  db={routes:(r.data||[]).filter(x=>x.city==='Тверь'),vehicles:(v.data||[]).filter(x=>x.city==='Тверь'),shifts:s.data||[],tickets:t||[],schedules:sch.data||[],cards:cards.data||[],cashShifts:cs.data||[],news:news.data||[]};
- currentShift=db.shifts.find(s=>s.status==='open')||null;currentCashShift=db.cashShifts.find(s=>s.status==='open')||null;
+ currentShift=db.shifts.find(s=>s.status==='open')||null;currentCashShift=db.cashShifts.find(s=>s.status==='open')||null;gameClockState=gc.data||null;
  if(currentShift){const activeRoute=db.routes.find(r=>r.id===currentShift.route_id&&!r.archived_at);if(activeRoute){const max=activeRoute.stops.length-1,current=Math.max(0,Math.min(Number(currentShift.current_stop_index||0),max)),end=Math.max(current,Math.min(Number(currentShift.end_stop_index??max),max));if(current!==currentShift.current_stop_index||end!==currentShift.end_stop_index){const fixed=await client.from('conductor_shifts').update({current_stop_index:current,end_stop_index:end}).eq('id',currentShift.id).select().single();if(!fixed.error){currentShift=fixed.data;db.shifts=db.shifts.map(s=>s.id===fixed.data.id?fixed.data:s)}}}}
- setCloud('База синхронизирована','ok');renderAll();
+ setCloud('База синхронизирована','ok');renderAll();renderGameClock();
 }
 function startRealtime(){if(realtimeChannel)return;realtimeChannel=client.channel('conductor-live-sync').on('postgres_changes',{event:'*',schema:'public'},payload=>{if(!String(payload.table||'').startsWith('conductor_')||realtimeLoading)return;clearTimeout(realtimeRefreshTimer);realtimeRefreshTimer=setTimeout(async()=>{if(realtimeLoading)return;realtimeLoading=true;try{await loadData()}catch(e){console.error('Realtime refresh failed',e);setCloud('Ошибка синхронизации','error')}finally{realtimeLoading=false}},350)}).subscribe((status,error)=>{if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')console.error('Conductor Realtime:',status,error)});}
 function nav(tab){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+tab))}
 function init(){
- $('realClock').textContent=new Date().toLocaleTimeString('ru-RU');setInterval(()=>$('realClock').textContent=new Date().toLocaleTimeString('ru-RU'),1000);
- $('gameClock').textContent='—';
+ $('realClock').textContent=new Date().toLocaleTimeString('ru-RU');renderGameClock();setInterval(()=>{$('realClock').textContent=new Date().toLocaleTimeString('ru-RU');renderGameClock()},1000);
  document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.tab)));
  document.querySelectorAll('[data-goto]').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.goto)));
  document.querySelectorAll('.db-tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.db-tab').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.db-view').forEach(x=>x.classList.toggle('active',x.id==='db-'+b.dataset.dbtab))}));
  $('saleRoute').onchange=()=>{updateSaleStops();if(currentShift&&$('saleRoute').value&&currentShift.route_id!==$('saleRoute').value)assignShiftRoute($('saleRoute').value)};$('saleFrom').onchange=()=>{if(!currentShift)updateSaleStops();else updateFare()};$('saleTo').onchange=updateFare;$('saleFare').onchange=updateFare;$('saleQty').oninput=updateFare;
  $('qtyMinus').onclick=()=>{$('saleQty').value=Math.max(1,Number($('saleQty').value)-1);updateFare()};$('qtyPlus').onclick=()=>{$('saleQty').value=Math.min(20,Number($('saleQty').value)+1);updateFare()};
  $('openPayment').onclick=openPayment;$('printTicket').onclick=()=>ticketPrint(lastTickets.length?lastTickets:lastTicket);$('showPhoneQr').onclick=showPhoneQr;$('addScheduleFolder').onclick=()=>{const f=prompt('Название папки маршрута, например 102:');if(!f)return;activeScheduleFolder=f.trim();editSchedule(null)};$('scheduleFolders').onclick=e=>{const b=e.target.closest('[data-folder]');if(b){activeScheduleFolder=b.dataset.folder;renderSchedules()}};$('scheduleEntries').onclick=e=>{const add=e.target.closest('#addScheduleText'),edit=e.target.closest('[data-edit-schedule]');if(add)editSchedule(null);if(edit)editSchedule(db.schedules.find(s=>s.id===edit.dataset.editSchedule))};
- $('tripCity').onchange=renderRouteSelects;$('liveRoute').onchange=()=>assignShiftRoute($('liveRoute').value);$('liveCurrentStop').onchange=()=>{if(currentShift){$('liveCurrentStop').value=String(currentShift.current_stop_index||0);toast('Используй кнопку «Следующая остановка»')}};$('liveEndStop').onchange=async()=>{if(!currentShift)return;const i=Number($('liveEndStop').value),current=Number(currentShift.current_stop_index||0);if(!Number.isInteger(i)||i<current){$('liveEndStop').value=String(currentShift.end_stop_index??current);toast('Конечная остановка не может быть раньше текущей','error');return}const route=activeTripRoute();if(!route||i>=route.stops.length){toast('Остановка не принадлежит действующему маршруту','error');syncTripStops();return}const q=await client.from('conductor_shifts').update({end_stop_index:i}).eq('id',currentShift.id).select().single();if(q.error){toast(q.error.message,'error');return}currentShift=q.data;db.shifts=db.shifts.map(s=>s.id===q.data.id?q.data:s);updateSaleStops();updateRouteSummary();toast('Конечная остановка рейса изменена','success')};$('tripGameTime').oninput=()=>{if(!currentShift)$('gameClock').textContent=$('tripGameTime').value||'—'};$('startShift').onclick=startShift;$('endShift').onclick=endShift;$('tripNextStop').onclick=nextStop;$('cashNextStop').onclick=nextStop;$('openCashShift').onclick=openCashShift;$('closeCashShift').onclick=closeCashShift;
+ $('tripCity').onchange=renderRouteSelects;$('liveRoute').onchange=()=>assignShiftRoute($('liveRoute').value);$('liveCurrentStop').onchange=()=>{if(currentShift){$('liveCurrentStop').value=String(currentShift.current_stop_index||0);toast('Используй кнопку «Следующая остановка»')}};$('liveEndStop').onchange=async()=>{if(!currentShift)return;const i=Number($('liveEndStop').value),current=Number(currentShift.current_stop_index||0);if(!Number.isInteger(i)||i<current){$('liveEndStop').value=String(currentShift.end_stop_index??current);toast('Конечная остановка не может быть раньше текущей','error');return}const route=activeTripRoute();if(!route||i>=route.stops.length){toast('Остановка не принадлежит действующему маршруту','error');syncTripStops();return}const q=await client.from('conductor_shifts').update({end_stop_index:i}).eq('id',currentShift.id).select().single();if(q.error){toast(q.error.message,'error');return}currentShift=q.data;db.shifts=db.shifts.map(s=>s.id===q.data.id?q.data:s);updateSaleStops();updateRouteSummary();toast('Конечная остановка рейса изменена','success')};$('gameClockPause').onclick=toggleGameClockPause;$('gameClockRate').onchange=()=>changeGameClockRate($('gameClockRate').value);$('gameClockBackHour').onclick=()=>jumpGameClock(-60);$('gameClockBack15').onclick=()=>jumpGameClock(-15);$('gameClockForward15').onclick=()=>jumpGameClock(15);$('gameClockForwardHour').onclick=()=>jumpGameClock(60);$('gameClockSet').onclick=setGameClockManually;$('startShift').onclick=startShift;$('endShift').onclick=endShift;$('tripNextStop').onclick=nextStop;$('cashNextStop').onclick=nextStop;$('openCashShift').onclick=openCashShift;$('closeCashShift').onclick=closeCashShift;
  $('dbCity').onchange=renderFleet;$('fleetSearch').oninput=renderFleet;$('routesCity').onchange=renderRoutes;
  $('addCard').onclick=()=>openCardEditor(null);$('cardsList').onclick=e=>{const b=e.target.closest('[data-edit-card]');if(b)openCardEditor(db.cards.find(c=>c.id===b.dataset.editCard))};$('addVehicle').onclick=()=>openVehicleEditor(null);$('addRoute').onclick=()=>openRouteEditor(null);$('tripAddRoute').onclick=()=>openRouteEditor(null);$('tripRoutesList').onclick=e=>{const ed=e.target.closest('[data-trip-edit-route]'),sel=e.target.closest('[data-trip-select-route]');if(ed)openRouteEditor(db.routes.find(r=>r.id===ed.dataset.tripEditRoute));if(sel)assignShiftRoute(sel.dataset.tripSelectRoute)};
  $('fleetList').onclick=e=>{const b=e.target.closest('[data-edit-vehicle]'),d=e.target.closest('[data-archive-vehicle]');if(b)openVehicleEditor(db.vehicles.find(v=>v.id===b.dataset.editVehicle));if(d)archiveRecord('conductor_vehicles',d.dataset.archiveVehicle)};
