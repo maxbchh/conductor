@@ -40,8 +40,8 @@ function toast(s,type=''){const el=$('payToast');el.textContent=s;el.className='
 function fill(el,items,placeholder){el.innerHTML='<option value="">'+placeholder+'</option>';items.forEach(x=>{const o=document.createElement('option');o.value=x.value;o.textContent=x.label;el.appendChild(o)})}
 function updateStops(){
  route=routes.find(r=>r.id===$('payRoute').value&&!r.archived_at)||null;
- const sameShiftRoute=!!route&&!!shift&&route.id===shift.route_id;
- const start=route?(sameShiftRoute?Math.max(0,Math.min(Number(shift.current_stop_index||0),route.stops.length-1)):0):0;
+ const sameShiftRoute=!!route&&!!shift&&route.id===shift.route_id,oldFrom=$('payFrom').value;
+ const start=route?(sameShiftRoute?Math.max(0,Math.min(Number(shift.current_stop_index||0),route.stops.length-1)):(!shift&&oldFrom!==''?Math.max(0,Math.min(Number(oldFrom),route.stops.length-1)):0)):0;
  const end=route?(sameShiftRoute?Math.max(start,Math.min(Number(shift.end_stop_index??route.stops.length-1),route.stops.length-1)):route.stops.length-1):0;
  fill($('payFrom'),(route?.stops||[]).map((s,i)=>({value:String(i),label:s})),'—');
  fill($('payTo'),(route?.stops||[]).map((s,i)=>({value:String(i),label:s})).filter(x=>Number(x.value)>start&&Number(x.value)<=end),'Выбери остановку');
@@ -93,7 +93,7 @@ async function init(){
   fill($('payRoute'),routes.map(x=>({value:x.id,label:x.name})),'Выбери маршрут');
   if(routeParam&&routes.some(x=>x.id===routeParam))$('payRoute').value=routeParam;else if(shift?.route_id)$('payRoute').value=shift.route_id;
   fill($('payCard'),cards.map(x=>({value:x.id,label:x.holder+' · '+money(x.balance)})),'Выбери карту для оплаты');
-  $('payRoute').onchange=updateStops;$('payTo').onchange=updateTotal;$('payFare').onchange=updateTotal;$('payQty').oninput=updateTotal;
+  $('payRoute').onchange=()=>{route=null;updateStops()};$('payFrom').onchange=updateStops;$('payTo').onchange=updateTotal;$('payFare').onchange=updateTotal;$('payQty').oninput=updateTotal;
   $('payCash').onclick=()=>finish('cash');$('payByCard').onclick=()=>finish('card');
   if(shift?.route_id&&routes.some(x=>x.id===shift.route_id))$('payRoute').value=shift.route_id;
   updateStops();$('payStatus').textContent='Кассовая смена открыта';$('payStatus').className='shift-badge open';
