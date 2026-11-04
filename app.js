@@ -118,7 +118,7 @@ function makeVirtualCardNumber(){
  do{number='9900'+Array.from({length:3},()=>String(Math.floor(Math.random()*10000)).padStart(4,'0')).join('')}while(used.has(number));
  return number;
 }
-function displayVirtualCardNumber(value){return String(value||'').replace(/(\\d{4})(?=\\d)/g,'$1 ')}
+function displayVirtualCardNumber(value){return String(value||'').replace(/(\d{4})(?=\d)/g,'$1 ')}
 function renderCards(){
  const el=$('cardsList');if(!el)return;
  el.innerHTML=db.cards.length?db.cards.map(c=>{
@@ -154,12 +154,12 @@ async function adjustVirtualCard(cardId,action){
 function openCardEditor(card){
  const edit=!!card,number=card?.card_number||makeVirtualCardNumber();
  showModal('<p class="eyebrow">ВИРТУАЛЬНЫЙ БАНК CONDUCTOR</p><h2>'+(edit?'Настроить карту':'Выпустить виртуальную карту')+'</h2><p class="hint">Это игровая карта. Номер выдуманный, не является банковским реквизитом. Не вводи данные настоящих карт.</p><div class="field-grid"><label class="field"><span>Владелец</span><input id="cardHolder" maxlength="80" value="'+esc(card?.holder||'')+'"></label><label class="field"><span>Название карты</span><input id="cardLabel" maxlength="80" value="'+esc(card?.label||'Карта Conductor')+'"></label><label class="field full"><span>Название виртуального банка</span><input id="cardBank" maxlength="50" value="'+esc(card?.bank_name||'Conductor Bank')+'"></label><label class="field full"><span>Выдуманный номер карты · 16 цифр</span><input id="cardNumber" inputmode="numeric" autocomplete="off" maxlength="16" value="'+esc(number)+'"></label><label class="field"><span>Тип карты</span><select id="cardType"><option '+((card?.card_type||'Классическая')==='Классическая'?'selected':'')+'>Классическая</option><option '+(card?.card_type==='Транспортная'?'selected':'')+'>Транспортная</option><option '+(card?.card_type==='Премиальная'?'selected':'')+'>Премиальная</option><option '+(card?.card_type==='Молодёжная'?'selected':'')+'>Молодёжная</option></select></label><label class="field"><span>Цвет карты</span><select id="cardColor"><option value="blue" '+((card?.card_color||'blue')==='blue'?'selected':'')+'>Синий</option><option value="violet" '+(card?.card_color==='violet'?'selected':'')+'>Фиолетовый</option><option value="green" '+(card?.card_color==='green'?'selected':'')+'>Зелёный</option><option value="dark" '+(card?.card_color==='dark'?'selected':'')+'>Тёмный</option></select></label>'+(edit?'':'<label class="field full"><span>Начальный баланс (BYN)</span><input id="cardInitialBalance" type="number" min="0" step=".01" value="0"></label>')+'</div><div class="modal-actions"><button id="saveCard" class="primary-btn">Сохранить карту</button></div>');
- $('cardNumber').addEventListener('input',()=>{$('cardNumber').value=$('cardNumber').value.replace(/\\D/g,'').slice(0,16)});
+ $('cardNumber').addEventListener('input',()=>{$('cardNumber').value=$('cardNumber').value.replace(/\D/g,'').slice(0,16)});
  $('saveCard').onclick=async()=>{
   const p={holder:$('cardHolder').value.trim(),label:$('cardLabel').value.trim()||'Виртуальная карта',bank_name:$('cardBank').value.trim()||'Conductor Bank',card_number:$('cardNumber').value.trim(),card_type:$('cardType').value,card_color:$('cardColor').value};
   const initial=edit?0:Math.max(0,Number($('cardInitialBalance').value)||0);
   if(!p.holder){toast('Укажи владельца карты','error');return}
-  if(!/^\\d{16}$/.test(p.card_number)){toast('Номер карты должен содержать ровно 16 цифр','error');return}
+  if(!/^\d{16}$/.test(p.card_number)){toast('Номер карты должен содержать ровно 16 цифр','error');return}
   if(db.cards.some(c=>c.card_number===p.card_number&&c.id!==card?.id)){toast('Такой выдуманный номер уже занят','error');return}
   try{
    const q=edit?await client.from('conductor_cards').update(p).eq('id',card.id).select().single():await client.from('conductor_cards').insert({...p,id:uid('card'),balance:0}).select().single();
