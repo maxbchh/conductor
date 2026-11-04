@@ -86,6 +86,7 @@ alter table public.conductor_shifts add column if not exists schedule_mode text 
 alter table public.conductor_shifts add column if not exists schedule_id text;
 alter table public.conductor_shifts add column if not exists arrival_time text;
 create table if not exists public.conductor_schedules(id text primary key,folder text not null,title text not null,body text not null default '',created_at timestamptz not null default now(),updated_at timestamptz not null default now());
+alter table public.conductor_schedules add column if not exists return_body text not null default '';
 alter table public.conductor_schedules enable row level security;
 drop policy if exists "Conductor public access schedules" on public.conductor_schedules;
 create policy "Conductor public access schedules" on public.conductor_schedules for all to anon,authenticated using(true) with check(true);
