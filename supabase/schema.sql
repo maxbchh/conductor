@@ -8,6 +8,8 @@ create table if not exists public.conductor_routes (
   city text not null default 'Тверь',
   stops jsonb not null default '[]'::jsonb,
   fare_per_stop numeric(10,2) not null default 0.50 check (fare_per_stop >= 0),
+  pair_id text,
+  direction text not null default 'outbound' check (direction in ('outbound','return')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -55,6 +57,7 @@ create table if not exists public.conductor_tickets (
   issued_at timestamptz not null default now()
 );
 
+create index if not exists conductor_routes_pair_idx on public.conductor_routes(pair_id, direction);
 create index if not exists conductor_tickets_shift_idx on public.conductor_tickets(shift_id);
 create index if not exists conductor_tickets_issued_idx on public.conductor_tickets(issued_at desc);
 create index if not exists conductor_shifts_started_idx on public.conductor_shifts(started_at desc);
