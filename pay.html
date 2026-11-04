@@ -72,7 +72,7 @@ async function finish(method){
  }catch(e){$('payResult').innerHTML='<div class="pay-fail">'+e.message+'</div>';toast('Оплата не прошла: '+e.message,'error');btn.disabled=false;btn.textContent=method==='cash'?'Наличными':'Оплатить картой'}
 }
 async function init(){
- if(!shiftId){$('payStatus').textContent='QR-код без номера смены';toast('Неверная ссылка','error');return}
+ if(!shiftId||!cashShiftId){$('payStatus').textContent='QR-код без номера смены';toast('Неверная ссылка','error');return}
  try{
   const [s,r,c]=await Promise.all([client.from('conductor_shifts').select('*').eq('id',shiftId).single(),client.from('conductor_routes').select('*').eq('city','Тверь').order('name'),client.from('conductor_cards').select('*').order('holder')]);
   if(s.error)throw s.error;if(r.error)throw r.error;if(c.error)throw c.error;
