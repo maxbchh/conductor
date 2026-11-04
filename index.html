@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#edf2fa"><title>Conductor — касса кондуктора</title>
+<link rel="stylesheet" href="./styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="./app.js"></script>
+</head>
+<body>
+<div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+<header class="topbar glass">
+ <a class="brand" href="#"><span class="brand-mark">C</span><span><b>Conductor</b><small>Кассовая система</small></span></a>
+ <div class="clock-group"><div><small>ОБЫЧНОЕ ВРЕМЯ</small><b id="realClock">--:--:--</b></div><i></i><div><small>ИГРОВОЕ ВРЕМЯ</small><b id="gameClock">--:--</b></div></div>
+ <div class="top-actions"><span id="cloudState" class="cloud-state"><i></i> Подключение…</span><span id="shiftBadge" class="shift-badge closed">Смена закрыта</span></div>
+</header>
+<nav class="tabs glass">
+ <button class="tab active" data-tab="cash"><span>▦</span> Касса</button>
+ <button class="tab" data-tab="trips"><span>↗</span> Рейсы</button>
+ <button class="tab" data-tab="database"><span>▤</span> База данных</button>
+</nav>
+<main>
+<section id="view-cash" class="view active">
+ <div class="page-heading"><div><p class="eyebrow">РАБОЧЕЕ МЕСТО</p><h1>Касса</h1><p class="muted">Продажа билетов по выбранному маршруту</p></div><div class="context-chip" id="cashContext">Смена не открыта</div></div>
+ <div class="cash-layout">
+  <div class="glass panel sale-panel">
+   <div class="panel-head"><div><p class="eyebrow">НОВАЯ ПРОДАЖА</p><h2>Параметры билета</h2></div><span class="step-pill">01 / 03</span></div>
+   <div class="field-grid">
+    <label class="field full"><span>Маршрут</span><select id="saleRoute"></select></label>
+    <label class="field"><span>Откуда</span><select id="saleFrom"></select></label>
+    <label class="field"><span>Куда</span><select id="saleTo"></select></label>
+    <label class="field"><span>Тариф</span><select id="saleFare"><option value="1">Полный · 100%</option><option value=".5">Льготный · 50%</option><option value=".75">Школьный · 75%</option></select></label>
+    <label class="field"><span>Количество</span><div class="quantity"><button id="qtyMinus" type="button">−</button><input id="saleQty" type="number" min="1" max="20" value="1"><button id="qtyPlus" type="button">+</button></div></label>
+   </div>
+   <div class="fare-summary"><div><small>Остановок</small><b id="stopCount">—</b></div><div><small>Цена за остановку</small><b id="farePerStop">—</b></div><div class="sum"><small>К оплате</small><b id="saleTotal">0,00 BYN</b></div></div>
+   <button id="openPayment" class="primary-btn" type="button">Перейти к оплате <span>→</span></button>
+   <p class="hint">Билет будет записан в базу только после подтверждения оплаты.</p>
+  </div>
+  <aside class="side-column">
+   <div class="glass panel shift-panel"><div class="panel-head"><div><p class="eyebrow">ТЕКУЩИЙ РЕЙС</p><h2>Информация</h2></div><span class="live-dot"></span></div><div class="trip-info"><div><small>Маршрут</small><b id="infoRoute">—</b></div><div><small>Подвижной состав</small><b id="infoVehicle">—</b></div><div><small>Игровое время старта</small><b id="infoGameTime">—</b></div></div><button class="secondary-btn" data-goto="trips">Управление рейсом</button></div>
+   <div class="glass panel stats-panel"><p class="eyebrow">ЗА ТЕКУЩУЮ СМЕНУ</p><div class="stats-row"><div><small>Билетов</small><b id="shiftTickets">0</b></div><div><small>Выручка</small><b id="shiftRevenue">0,00 BYN</b></div></div></div>
+  </aside>
+ </div>
+ <div class="glass panel preview-panel"><div class="preview-heading"><div><p class="eyebrow">ПЕЧАТЬ</p><h2>Мини-билет</h2><p class="muted">Компактный формат для термопринтера 58 мм</p></div><button id="printTicket" class="secondary-btn" type="button">Печать последнего</button></div><div class="ticket-stage"><div id="ticketPreview" class="ticket-paper"><b>БИЛЕТ № —</b><span>От: —</span><span>До: —</span><strong>— BYN</strong></div></div></div>
+</section>
+<section id="view-trips" class="view">
+ <div class="page-heading"><div><p class="eyebrow">УПРАВЛЕНИЕ СМЕНОЙ</p><h1>Рейсы</h1><p class="muted">Назначение подвижного состава и игрового времени</p></div></div>
+ <div class="glass panel trip-setup"><div class="panel-head"><div><p class="eyebrow">НОВАЯ СМЕНА</p><h2>Назначение рейса</h2></div><span class="step-pill">НАСТРОЙКА</span></div>
+  <div class="field-grid">
+   <label class="field"><span>Город / парк</span><select id="tripCity"><option>Тверь</option><option>Новоозёрск</option></select></label>
+   <label class="field"><span>Маршрут</span><select id="tripRoute"></select></label>
+   <label class="field"><span>Подвижной состав</span><select id="tripVehicle"></select></label>
+   <label class="field"><span>Игровое время</span><input id="tripGameTime" type="time" value="08:00"></label>
+  </div>
+  <div class="trip-actions"><button id="startShift" class="primary-btn" type="button">Открыть смену и начать рейс →</button><button id="endShift" class="danger-btn" type="button" disabled>Завершить смену</button></div>
+  <p class="hint">Автобус автоматически получает статус «На рейсе». После завершения смены возвращается к предыдущему статусу.</p>
+ </div>
+ <div class="glass panel"><div class="panel-head"><div><p class="eyebrow">ИСТОРИЯ</p><h2>Последние рейсы</h2></div></div><div id="shiftHistory" class="empty-state">Рейсов пока нет</div></div>
+</section>
+<section id="view-database" class="view">
+ <div class="page-heading"><div><p class="eyebrow">СПРАВОЧНИКИ</p><h1>База данных</h1><p class="muted">Подвижной состав, маршруты и история билетов</p></div></div>
+ <div class="db-tabs"><button class="db-tab active" data-dbtab="fleet">Автобусный парк</button><button class="db-tab" data-dbtab="routes">Маршруты</button><button class="db-tab" data-dbtab="tickets">Билеты</button></div>
+ <div id="db-fleet" class="db-view active glass panel"><div class="panel-head"><div><p class="eyebrow">ПОДВИЖНОЙ СОСТАВ</p><h2>Автобусный парк</h2></div><button id="addVehicle" class="primary-btn compact">＋ Добавить</button></div><div class="db-toolbar"><label class="field"><span>Город</span><select id="dbCity"><option>Тверь</option><option>Новоозёрск</option></select></label><input id="fleetSearch" class="search-input" placeholder="Поиск по модели или номеру"></div><div id="fleetList" class="table-wrap"></div></div>
+ <div id="db-routes" class="db-view glass panel"><div class="panel-head"><div><p class="eyebrow">МАРШРУТНАЯ СЕТЬ</p><h2>Редактор маршрутов</h2></div><button id="addRoute" class="primary-btn compact">＋ Маршрут</button></div><div class="db-toolbar"><label class="field"><span>Город</span><select id="routesCity"><option>Тверь</option><option>Новоозёрск</option></select></label></div><div id="routesList" class="table-wrap"></div></div>
+ <div id="db-tickets" class="db-view glass panel"><div class="panel-head"><div><p class="eyebrow">ИСТОРИЯ ПРОДАЖ</p><h2>База билетов</h2></div><span class="step-pill" id="ticketCount">0 билетов</span></div><div id="ticketsList" class="table-wrap"></div></div>
+</section>
+</main>
+<div id="modalLayer" class="modal-layer" aria-hidden="true"><div class="modal glass"><button id="modalClose" class="modal-close" type="button">×</button><div id="modalContent"></div></div></div>
+<div id="toast" class="toast"></div>
+</body></html>
