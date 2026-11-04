@@ -82,74 +82,53 @@ function renderHistory(){
  const rows=[...db.shifts].sort((a,b)=>new Date(b.started_at)-new Date(a.started_at)).slice(0,20);
  $('shiftHistory').innerHTML=rows.length?'<div class="table-wrap"><table><thead><tr><th>Маршрут</th><th>Состав</th><th>Игровое время</th><th>Статус</th><th>Начало</th></tr></thead><tbody>'+rows.map(s=>{const r=db.routes.find(x=>x.id===s.route_id),v=db.vehicles.find(x=>x.id===s.vehicle_id);return '<tr><td>'+esc(r?.name||'—')+'</td><td>'+esc(v?.number||'—')+'</td><td>'+esc(s.game_time||'—')+'</td><td><span class="status-tag '+(s.status==='open'?'active':'')+'">'+(s.status==='open'?'Открыт':'Завершён')+'</span></td><td>'+new Date(s.started_at).toLocaleString('ru-RU')+'</td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty-state">Рейсов пока нет</div>';
 }
-function renderTicket(t){
- if(!t)return;
- lastTicket=t;
- $('ticketPreview').innerHTML='<b>БИЛЕТ № '+esc(t.ticket_number)+'</b><span>От: '+esc(t.from_stop)+'</span><span>До: '+esc(t.to_stop)+'</span><strong>'+money(t.amount)+'</strong><div id="ticketQr" class="ticket-qr"></div>';
- const route=db.routes.find(r=>r.id===t.route_id),from=route?route.stops.indexOf(t.from_stop):0,to=route?route.stops.indexOf(t.to_stop):Math.max(1,Number(t.stop_count)||1);
- if(window.QRCode)new QRCode($('ticketQr'),{text:'CONDUCTOR|'+t.route_id+'|'+Math.max(0,from)+'|'+Math.max(1,to),width:76,height:76,correctLevel:QRCode.CorrectLevel.M});
-}
-function renderAll(){renderRouteSelects();renderFleet();renderRoutes();renderTripRoutes();renderTickets();renderHistory();renderStats();renderInfo();renderSchedules();renderCards()}
-
-function renderSchedules(){
- const folders=[...new Set(db.schedules.map(s=>s.folder))].sort((a,b)=>a.localeCompare(b,'ru'));
- $('scheduleFolders').innerHTML=folders.map(f=>'<button class="schedule-folder '+(activeScheduleFolder===f?'active':'')+'" data-folder="'+esc(f)+'">📁 '+esc(f)+'<small>'+db.schedules.filter(s=>s.folder===f).length+' расписаний</small></button>').join('')||'<div class="empty-state">Создай папку, например 102</div>';
- const rows=db.schedules.filter(s=>s.folder===activeScheduleFolder);
- $('scheduleEntries').innerHTML=activeScheduleFolder?'<div class="panel-head"><div><p class="eyebrow">ПАПКА МАРШРУТА</p><h2>'+esc(activeScheduleFolder)+'</h2></div><button class="primary-btn compact" id="addScheduleText">＋ Добавить расписание</button></div>'+(rows.map(s=>'<article class="schedule-entry"><b>'+esc(s.title)+'</b><pre>'+esc(s.body)+'</pre><button class="table-action" data-edit-schedule="'+esc(s.id)+'">Изменить</button></article>').join('')||'<div class="empty-state">Расписаний пока нет</div>'):'<div class="empty-state">Выбери папку маршрута</div>';
- $('scheduleFolders').querySelectorAll('[data-folder]').forEach(b=>b.onclick=()=>{activeScheduleFolder=b.dataset.folder;renderSchedules()});
- $('addScheduleText')?.addEventListener('click',()=>editSchedule(null));
- $('scheduleEntries').querySelectorAll('[data-edit-schedule]').forEach(b=>b.onclick=()=>editSchedule(db.schedules.find(s=>s.id===b.dataset.editSchedule)));
-}
-function editSchedule(s){
- const editing=!!s;
- showModal('<p class="eyebrow">РАСПИСАНИЕ · ТВЕРЬ</p><h2>'+(editing?'Изменить расписание':'Новое расписание')+'</h2><div class="field-grid"><label class="field full"><span>Название / вариант</span><input id="scheduleTitle" value="'+esc(s?.title||'Основное расписание')+'"></label><label class="field full"><span>Текст расписания</span><textarea id="scheduleBody" rows="12">'+esc(s?.body||'')+'</textarea></label></div><div class="modal-actions"><button id="saveSchedule" class="primary-btn">Сохранить</button></div>');
- $('saveSchedule').onclick=async()=>{const p={folder:activeScheduleFolder,title:$('scheduleTitle').value.trim(),body:$('scheduleBody').value};if(!p.title){toast('Укажи название');return}try{const q=editing?await client.from('conductor_schedules').update(p).eq('id',s.id).select().single():await client.from('conductor_schedules').insert({...p,id:uid('schedule')}).select().single();if(q.error)throw q.error;if(editing)db.schedules=db.schedules.map(x=>x.id===s.id?q.data:x);else db.schedules.push(q.data);closeModal();renderSchedules();toast('Расписание сохранено')}catch(e){toast('Ошибка: '+e.message)}};
-}
-function scanQr(){
- showModal('<p class="eyebrow">QR-СКАНЕР</p><h2>Наведите камеру на QR-код</h2><video id="qrVideo" autoplay playsinline style="width:100%;border-radius:16px;background:#111;min-height:180px"></video><p class="hint" id="qrMessage">Ожидание камеры…</p>');
- let stream=null,active=true;const video=$('qrVideo');$('modalClose').onclick=()=>{active=false;stream?.getTracks().forEach(t=>t.stop());closeModal()};
- if(!('BarcodeDetector' in window)){ $('qrMessage').textContent='QR-сканер этого браузера не поддерживает. Используй Chrome или Edge.';return; }
- (async()=>{try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});video.srcObject=stream;const detector=new BarcodeDetector({formats:['qr_code']});const tick=async()=>{if(!active)return;try{const found=await detector.detect(video);if(found.length){parseQr(found[0].rawValue);active=false;stream.getTracks().forEach(t=>t.stop());closeModal();return}}catch(e){}requestAnimationFrame(tick)};tick()}catch(e){$('qrMessage').textContent='Нет доступа к камере: '+e.message}})();
-}
-function parseQr(raw){
- let routeKey=null,from=null,to=null;
- try{const u=new URL(raw);routeKey=u.searchParams.get('route')||u.searchParams.get('routeId');from=u.searchParams.get('from');to=u.searchParams.get('to')}catch(e){}
- try{if(!routeKey&&raw.trim().startsWith('{')){const j=JSON.parse(raw);routeKey=j.routeId||j.route||j.route_id;from=j.fromIndex??j.from;to=j.toIndex??j.to}}catch(e){}
- if(!routeKey&&raw.startsWith('CONDUCTOR|')){const p=raw.split('|');routeKey=p[1];from=p[2];to=p[3]}
- const r=db.routes.find(x=>x.id===routeKey||x.name===routeKey);
- if(!r){toast('Неизвестный формат QR. Для совместимости нужен пример старого кода.');return}
- $('saleRoute').value=r.id;updateSaleStops();
- const index=v=>{if(v==null)return null;if(/^\\d+$/.test(String(v)))return String(v);const n=r.stops.findIndex(x=>x.toLowerCase()===String(v).toLowerCase());return n<0?null:String(n)};
- const x=index(from),y=index(to);if(x!==null)$('saleFrom').value=x;if(y!==null)$('saleTo').value=y;updateFare();toast('Маршрут и остановки выбраны по QR');
-}
-
+function renderTicket(t){if(!t)return;lastTicket=t;$('ticketPreview').innerHTML='<b>БИЛЕТ № '+esc(t.ticket_number)+'</b><span>От: '+esc(t.from_stop)+'</span><span>До: '+esc(t.to_stop)+'</span><strong>'+money(t.amount)+'</strong>'}
 function ticketPrint(t){
  if(!t){toast('Сначала продай билет');return}
  let root=document.getElementById('ticketPrintRoot');if(root)root.remove();
- root=document.createElement('div');root.id='ticketPrintRoot';root.innerHTML='<div class="ticket-paper printable"><b>БИЛЕТ № '+esc(t.ticket_number)+'</b><span>От: '+esc(t.from_stop)+'</span><span>До: '+esc(t.to_stop)+'</span><strong>'+money(t.amount)+'</strong><div id="printTicketQr" class="ticket-qr"></div></div>';const route=db.routes.find(r=>r.id===t.route_id),from=route?route.stops.indexOf(t.from_stop):0,to=route?route.stops.indexOf(t.to_stop):Math.max(1,Number(t.stop_count)||1);if(window.QRCode)new QRCode($('printTicketQr'),{text:'CONDUCTOR|'+t.route_id+'|'+Math.max(0,from)+'|'+Math.max(1,to),width:64,height:64,correctLevel:QRCode.CorrectLevel.M});
+ root=document.createElement('div');root.id='ticketPrintRoot';
+ root.innerHTML='<div class="ticket-paper printable"><b>БИЛЕТ № '+esc(t.ticket_number)+'</b><span>От: '+esc(t.from_stop)+'</span><span>До: '+esc(t.to_stop)+'</span><strong>'+money(t.amount)+'</strong></div>';
  document.body.appendChild(root);document.body.classList.add('print-ticket');window.print();
- window.onafterprint=()=>{document.body.classList.remove('print-ticket');root.remove();};
+ window.onafterprint=()=>{document.body.classList.remove('print-ticket');root.remove()};
+}
+function showPhoneQr(){
+ if(!currentShift){toast('Сначала открой смену','error');return}
+ const routeId=$('saleRoute').value||currentShift.route_id||'';
+ const base=location.href.split('?')[0].replace(/index\\.html?$/,'').replace(/#.*$/,'');
+ const url=base+'pay.html?shift='+encodeURIComponent(currentShift.id)+(routeId?'&route='+encodeURIComponent(routeId):'');
+ showModal('<p class="eyebrow">ПОКУПКА НА ТЕЛЕФОНЕ</p><h2>QR-код для телефона</h2><p class="hint">На другом устройстве открой камеру и наведи её на этот код. Откроется форма выбора остановки и оплаты.</p><div id="phoneQr" class="phone-qr"></div><p class="hint">'+esc(url)+'</p>');
+ new QRCode($('phoneQr'),{text:url,width:220,height:220,correctLevel:QRCode.CorrectLevel.M});
 }
 function openPayment(){
- const x=updateFare();if(!x.valid){toast('Выбери маршрут и корректные остановки');return}
- if(!currentShift){toast('Сначала открой смену в разделе «Рейсы»');return}
+ const x=updateFare();if(!x.valid){toast('Выбери маршрут и остановку назначения','error');return}
+ if(!currentShift){toast('Сначала открой смену в разделе «Рейсы»','error');return}
  const fareName=x.mult===.5?'Льготный':x.mult===.75?'Школьный':'Полный';
- showModal('<p class="eyebrow">ПОДТВЕРЖДЕНИЕ ПОКУПКИ</p><h2>Оплата билета</h2><div class="payment-total">'+money(x.total)+'</div><div class="trip-info"><div><small>Маршрут</small><b>'+esc(x.r.name)+'</b></div><div><small>Путь</small><b>'+esc(x.r.stops[x.a])+' → '+esc(x.r.stops[x.b])+'</b></div><div><small>Тариф · количество</small><b>'+fareName+' · '+x.qty+'</b></div></div><label class="field"><span>Получено наличными</span><input id="cashReceived" type="number" min="'+x.total+'" step=".01" value="'+x.total.toFixed(2)+'"></label><div class="quick-cash">'+[1,2,3,4,5,10,15,20,25,30,35,40,45,50].map(n=>'<button type="button" data-cash="'+n+'">'+n+'</button>').join('')+'</div><div class="fare-summary"><div><small>К оплате</small><b>'+money(x.total)+'</b></div><div><small>Получено</small><b id="receivedValue">'+money(x.total)+'</b></div><div class="sum"><small>Сдача</small><b id="changeValue">0,00 BYN</b></div></div><div class="payment-methods"><button id="payCash" class="primary-btn">Наличными</button><button id="payCard" class="secondary-btn">Оплатить картой</button></div><p class="hint">Оплата картой здесь отмечается как безналичная операция внутри симулятора; реальный банковский эквайринг не подключён.</p>');
+ const cards=db.cards.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.holder)+' · '+money(c.balance)+'</option>').join('');
+ showModal('<p class="eyebrow">ПОДТВЕРЖДЕНИЕ ПОКУПКИ</p><h2>Оплата билета</h2><div class="payment-total">'+money(x.total)+'</div><div class="trip-info"><div><small>Маршрут</small><b>'+esc(x.r.name)+'</b></div><div><small>Путь</small><b>'+esc(x.r.stops[x.a])+' → '+esc(x.r.stops[x.b])+'</b></div><div><small>Тариф · количество</small><b>'+fareName+' · '+x.qty+'</b></div></div><label class="field"><span>Получено наличными</span><input id="cashReceived" type="number" min="'+x.total+'" step=".01" value="'+x.total.toFixed(2)+'"></label><div class="quick-cash">'+[1,2,3,4,5,10,15,20,25,30,35,40,45,50].map(n=>'<button type="button" data-cash="'+n+'">'+n+'</button>').join('')+'</div><label class="field"><span>Виртуальная карта</span><select id="cardForPayment"><option value="">Выбери карту</option>'+cards+'</select></label><div class="fare-summary"><div><small>К оплате</small><b>'+money(x.total)+'</b></div><div><small>Получено</small><b id="receivedValue">'+money(x.total)+'</b></div><div class="sum"><small>Сдача</small><b id="changeValue">0,00 BYN</b></div></div><div class="payment-methods"><button id="payCash" class="primary-btn">Наличными</button><button id="payCard" class="secondary-btn">Оплатить картой</button></div><p class="hint">Карта виртуальная, только для игровой симуляции. Настоящие банковские платежи не выполняются.</p>');
  const input=$('cashReceived');
- function change(){const received=Math.max(0,Number(input.value)||0);$('receivedValue').textContent=money(received);$('changeValue').textContent=money(Math.max(0,received-x.total));}
+ function change(){const received=Math.max(0,Number(input.value)||0);$('receivedValue').textContent=money(received);$('changeValue').textContent=money(Math.max(0,received-x.total))}
  input.addEventListener('input',change);
  document.querySelectorAll('[data-cash]').forEach(b=>b.addEventListener('click',()=>{input.value=Number(b.dataset.cash).toFixed(2);change()}));
- $('payCash').addEventListener('click',()=>{const received=Number(input.value)||0;if(received+0.00001<x.total){toast('Недостаточно наличных');return}completeSale(x,'cash',received)});
- $('payCard').addEventListener('click',()=>completeSale(x,'card',x.total));
+ $('payCash').onclick=()=>{const received=Number(input.value)||0;if(received+0.00001<x.total){toast('Недостаточно наличных','error');return}completeSale(x,'cash',received,null)};
+ $('payCard').onclick=()=>{const id=$('cardForPayment').value;if(!id){toast('Создай или выбери виртуальную карту','error');return}completeSale(x,'card',x.total,id)};
 }
-async function completeSale(x,method,received){
- const button=method==='cash'?$('payCash'):$('payCard');button.disabled=true;button.textContent='Сохранение…';
+async function completeSale(x,method,received,cardId){
+ const button=method==='cash'?$('payCash'):$('payCard');button.disabled=true;button.textContent='Проверка оплаты…';let chargedCard=null;
  try{
+  if(method==='card'){
+   const card=db.cards.find(c=>c.id===cardId);if(!card)throw new Error('Виртуальная карта не найдена');
+   const charge=await client.from('conductor_cards').update({balance:Number((Number(card.balance)-x.total).toFixed(2))}).eq('id',cardId).gte('balance',x.total).select().single();
+   if(charge.error||!charge.data)throw new Error('Недостаточно средств на карте');
+   chargedCard=charge.data;db.cards=db.cards.map(c=>c.id===cardId?charge.data:c);
+  }
   const fareName=x.mult===.5?'Льготный':x.mult===.75?'Школьный':'Полный';
-  const rows=Array.from({length:x.qty},()=>({shift_id:currentShift.id,route_id:x.r.id,route_name:x.r.name,from_stop:x.r.stops[x.a],to_stop:x.r.stops[x.b],stop_count:x.stops,fare_type:fareName,fare_multiplier:x.mult,fare_per_stop:x.per,amount:Number((x.stops*x.per*x.mult).toFixed(2)),payment_method:method,cash_received:method==='cash'?received/x.qty:x.total/x.qty,change_due:method==='cash'?Math.max(0,received-x.total)/x.qty:0,game_time:currentShift.game_time}));
-  const {data,error}=await client.from('conductor_tickets').insert(rows).select('*');if(error)throw error;
-  db.tickets.push(...data);renderTicket(data[0]);closeModal();renderStats();renderTickets();toast('Оплата принята · билет № '+data[0].ticket_number);
- }catch(e){console.error(e);button.disabled=false;button.textContent=method==='cash'?'Наличными':'Оплатить картой';toast('Не удалось сохранить билет: '+(e.message||'ошибка базы'))}
+  const rows=Array.from({length:x.qty},()=>({shift_id:currentShift.id,route_id:x.r.id,route_name:x.r.name,from_stop:x.r.stops[x.a],to_stop:x.r.stops[x.b],stop_count:x.stops,fare_type:fareName,fare_multiplier:x.mult,fare_per_stop:x.per,amount:Number((x.stops*x.per*x.mult).toFixed(2)),payment_method:method,cash_received:method==='cash'?received/x.qty:x.total/x.qty,change_due:method==='cash'?Math.max(0,received-x.total)/x.qty:0,game_time:currentShift.game_time,card_id:cardId}));
+  const q=await client.from('conductor_tickets').insert(rows).select('*');if(q.error)throw q.error;
+  db.tickets.push(...q.data);renderTicket(q.data[0]);closeModal();renderStats();renderTickets();renderCards();toast(method==='card'?'Оплата картой прошла · билет № '+q.data[0].ticket_number:'Оплата принята · билет № '+q.data[0].ticket_number,'success');
+ }catch(e){
+  if(chargedCard){const refund=await client.from('conductor_cards').update({balance:Number((Number(chargedCard.balance)+x.total).toFixed(2))}).eq('id',cardId).select().single();if(!refund.error)db.cards=db.cards.map(c=>c.id===cardId?refund.data:c)}
+  button.disabled=false;button.textContent=method==='cash'?'Наличными':'Оплатить картой';renderCards();toast('Оплата не прошла: '+e.message,'error');
+ }
 }
 function openVehicleEditor(v){
  const edit=!!v;
@@ -218,10 +197,10 @@ function init(){
  document.querySelectorAll('.db-tab').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.db-tab').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.db-view').forEach(x=>x.classList.toggle('active',x.id==='db-'+b.dataset.dbtab))}));
  $('saleRoute').onchange=()=>{updateSaleStops();if(currentShift&&$('saleRoute').value&&currentShift.route_id!==$('saleRoute').value)assignShiftRoute($('saleRoute').value)};$('saleFrom').onchange=updateFare;$('saleTo').onchange=updateFare;$('saleFare').onchange=updateFare;$('saleQty').oninput=updateFare;
  $('qtyMinus').onclick=()=>{$('saleQty').value=Math.max(1,Number($('saleQty').value)-1);updateFare()};$('qtyPlus').onclick=()=>{$('saleQty').value=Math.min(20,Number($('saleQty').value)+1);updateFare()};
- $('openPayment').onclick=openPayment;$('printTicket').onclick=()=>ticketPrint(lastTicket);$('showPhoneQr').onclick=showPhoneQr;$('addScheduleFolder').onclick=()=>{const f=prompt('Название папки маршрута, например 102:');if(!f)return;activeScheduleFolder=f.trim();editSchedule(null)};$('scheduleFolders').onclick=e=>{const b=e.target.closest('[data-folder]');if(b){activeScheduleFolder=b.dataset.folder;renderSchedules()}};$('scheduleEntries').onclick=e=>{const add=e.target.closest('#addScheduleText'),edit=e.target.closest('[data-edit-schedule]');if(add)editSchedule(null);if(edit)editSchedule(db.schedules.find(s=>s.id===edit.dataset.editSchedule))};
+ $('openPayment').onclick=openPayment;$('printTicket').onclick=()=>ticketPrint(lastTicket);$('showPhoneQr').onclick=showPhoneQr;$('showPhoneQr').onclick=showPhoneQr;$('addScheduleFolder').onclick=()=>{const f=prompt('Название папки маршрута, например 102:');if(!f)return;activeScheduleFolder=f.trim();editSchedule(null)};$('scheduleFolders').onclick=e=>{const b=e.target.closest('[data-folder]');if(b){activeScheduleFolder=b.dataset.folder;renderSchedules()}};$('scheduleEntries').onclick=e=>{const add=e.target.closest('#addScheduleText'),edit=e.target.closest('[data-edit-schedule]');if(add)editSchedule(null);if(edit)editSchedule(db.schedules.find(s=>s.id===edit.dataset.editSchedule))};$('scheduleFolders').onclick=e=>{const b=e.target.closest('[data-folder]');if(b){activeScheduleFolder=b.dataset.folder;renderSchedules()}};$('scheduleEntries').onclick=e=>{const add=e.target.closest('#addScheduleText'),edit=e.target.closest('[data-edit-schedule]');if(add)editSchedule(null);if(edit)editSchedule(db.schedules.find(s=>s.id===edit.dataset.editSchedule))};
  $('tripCity').onchange=renderRouteSelects;$('liveRoute').onchange=()=>assignShiftRoute($('liveRoute').value);$('liveCurrentStop').onchange=async()=>{if(!currentShift)return;const i=Number($('liveCurrentStop').value);try{const q=await client.from('conductor_shifts').update({current_stop_index:i}).eq('id',currentShift.id).select().single();if(q.error)throw q.error;currentShift=q.data;db.shifts=db.shifts.map(s=>s.id===q.data.id?q.data:s);renderInfo();updateSaleStops();toast('Текущая остановка обновлена','success')}catch(e){toast('Ошибка: '+e.message)}};$('liveEndStop').onchange=async()=>{if(!currentShift)return;const i=Number($('liveEndStop').value);const q=await client.from('conductor_shifts').update({end_stop_index:i}).eq('id',currentShift.id).select().single();if(q.error){toast(q.error.message,'error');return}currentShift=q.data;toast('Конечная остановка рейса изменена','success')};$('tripGameTime').oninput=()=>{if(!currentShift)$('gameClock').textContent=$('tripGameTime').value||'—'};$('startShift').onclick=startShift;$('endShift').onclick=endShift;
  $('dbCity').onchange=renderFleet;$('fleetSearch').oninput=renderFleet;$('routesCity').onchange=renderRoutes;
- $('addCard').onclick=()=>openCardEditor(null);$('cardsList').onclick=e=>{const b=e.target.closest('[data-edit-card]');if(b)openCardEditor(db.cards.find(c=>c.id===b.dataset.editCard))};$('addVehicle').onclick=()=>openVehicleEditor(null);$('addRoute').onclick=()=>openRouteEditor(null);$('tripAddRoute').onclick=()=>openRouteEditor(null);$('tripRoutesList').onclick=e=>{const ed=e.target.closest('[data-trip-edit-route]'),sel=e.target.closest('[data-trip-select-route]');if(ed)openRouteEditor(db.routes.find(r=>r.id===ed.dataset.tripEditRoute));if(sel)assignShiftRoute(sel.dataset.tripSelectRoute)};
+ $('addCard').onclick=()=>openCardEditor(null);$('cardsList').onclick=e=>{const b=e.target.closest('[data-edit-card]');if(b)openCardEditor(db.cards.find(c=>c.id===b.dataset.editCard))};$('addCard').onclick=()=>openCardEditor(null);$('cardsList').onclick=e=>{const b=e.target.closest('[data-edit-card]');if(b)openCardEditor(db.cards.find(c=>c.id===b.dataset.editCard))};$('addVehicle').onclick=()=>openVehicleEditor(null);$('addRoute').onclick=()=>openRouteEditor(null);$('tripAddRoute').onclick=()=>openRouteEditor(null);$('tripRoutesList').onclick=e=>{const ed=e.target.closest('[data-trip-edit-route]'),sel=e.target.closest('[data-trip-select-route]');if(ed)openRouteEditor(db.routes.find(r=>r.id===ed.dataset.tripEditRoute));if(sel)assignShiftRoute(sel.dataset.tripSelectRoute)};
  $('fleetList').onclick=e=>{const b=e.target.closest('[data-edit-vehicle]');if(b)openVehicleEditor(db.vehicles.find(v=>v.id===b.dataset.editVehicle))};
  $('routesList').onclick=e=>{const b=e.target.closest('[data-edit-route]');if(b)openRouteEditor(db.routes.find(r=>r.id===b.dataset.editRoute))};
  $('modalClose').onclick=closeModal;$('modalLayer').onclick=e=>{if(e.target===$('modalLayer'))closeModal()};document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
