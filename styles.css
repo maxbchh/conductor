@@ -9,3 +9,5 @@ select option{background:#f5f8ff;color:#1c2a40}
 .schedule-folder.active{border-color:#8db4ff;background:#eaf2ff;color:#3977e7}
 
 .ticket-qr{display:flex;justify-content:center;align-items:center;margin:3px auto 0;min-height:0}.ticket-qr img,.ticket-qr canvas{display:block;width:64px!important;height:64px!important;image-rendering:pixelated}.ticket-paper .ticket-qr img,.ticket-paper .ticket-qr canvas{width:54px!important;height:54px!important}
+
+.trip-route-editor{max-width:1000px}.trip-route-editor .panel-head{align-items:center}.trip-route-editor .muted{margin-top:5px}.trip-route-editor .table-action{white-space:nowrap}
