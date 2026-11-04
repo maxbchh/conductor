@@ -170,20 +170,14 @@ returns trigger language plpgsql security invoker set search_path=''
 as $$
 declare v_driver_status text; v_cash_status text;
 begin
- if new.shift_id is null or new.cash_shift_id is null then
-  raise exception 'An open driver shift and cash shift are required for ticket sales' using errcode='23514';
- end if;
- select status into v_driver_status from public.conductor_shifts where id=new.shift_id;
- if v_driver_status is distinct from 'open' then
-  raise exception 'Driver shift is closed or does not exist' using errcode='23514';
- end if;
+ if new.cash_shift_id is null then raise exception 'An open cash shift is required for ticket sales' using errcode='23514'; end if;
  select status into v_cash_status from public.conductor_cash_shifts where id=new.cash_shift_id;
- if v_cash_status is distinct from 'open' then
-  raise exception 'Cash shift is closed or does not exist' using errcode='23514';
+ if v_cash_status is distinct from 'open' then raise exception 'Cash shift is closed or does not exist' using errcode='23514'; end if;
+ if new.shift_id is not null then
+  select status into v_driver_status from public.conductor_shifts where id=new.shift_id;
+  if v_driver_status is distinct from 'open' then raise exception 'Driver shift is closed or does not exist' using errcode='23514'; end if;
  end if;
- if new.route_id is not null and exists(select 1 from public.conductor_routes where id=new.route_id and archived_at is not null) then
-  raise exception 'Archived routes cannot be used for ticket sales' using errcode='23514';
- end if;
+ if new.route_id is not null and exists(select 1 from public.conductor_routes where id=new.route_id and archived_at is not null) then raise exception 'Archived routes cannot be used for ticket sales' using errcode='23514'; end if;
  return new;
 end $$;
 drop trigger if exists conductor_ticket_shift_guard on public.conductor_tickets;
@@ -227,7 +221,7 @@ begin
    where item->>'shift_id' is distinct from v_shift_id or item->>'cash_shift_id' is distinct from v_cash_shift_id) then
   raise exception 'All tickets in one payment must belong to the same shifts';
  end if;
- if not exists(select 1 from public.conductor_shifts where id=v_shift_id and status='open') then raise exception 'Driver shift is closed'; end if;
+ if v_shift_id is not null and not exists(select 1 from public.conductor_shifts where id=v_shift_id and status='open') then raise exception 'Driver shift is closed'; end if;
  if not exists(select 1 from public.conductor_cash_shifts where id=v_cash_shift_id and status='open') then raise exception 'Cash shift is closed'; end if;
  update public.conductor_cards set balance=balance-v_total,updated_at=now()
   where id=p_card_id and balance>=v_total returning balance into v_balance;
