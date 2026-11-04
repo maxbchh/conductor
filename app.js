@@ -26,13 +26,14 @@ function renderRouteSelects(){
 function updateSaleStops(){
  const r=activeRoute(),from=$('saleFrom'),to=$('saleTo'),oldTo=to.value,start=currentShift?Number(currentShift.current_stop_index||0):0;
  fillSelect(from,(r?.stops||[]).map((s,i)=>({value:String(i),label:s})),'Остановка отправления');
- fillSelect(to,(r?.stops||[]).map((s,i)=>({value:String(i),label:s})).filter(x=>Number(x.value)>start),'Остановка назначения');
+ const end=currentShift&&currentShift.end_stop_index!=null?Number(currentShift.end_stop_index):((r?.stops?.length||1)-1);
+ fillSelect(to,(r?.stops||[]).map((s,i)=>({value:String(i),label:s})).filter(x=>Number(x.value)>start&&Number(x.value)<=end),'Остановка назначения');
  if(r&&start<r.stops.length)from.value=String(start);
  if(r&&oldTo!==''&&Number(oldTo)>start)to.value=oldTo;
  from.disabled=!!currentShift;updateFare();
 }
 function updateFare(){
- const r=activeRoute(),a=Number($('saleFrom').value),b=Number($('saleTo').value),valid=!!r&&!!currentShift&&Number.isInteger(a)&&Number.isInteger(b)&&b>a;
+ const r=activeRoute(),a=Number($('saleFrom').value),b=Number($('saleTo').value),valid=!!r&&!!currentShift&&Number.isInteger(a)&&Number.isInteger(b)&&b>a&&(currentShift.end_stop_index==null||b<=Number(currentShift.end_stop_index));
  const stops=valid?b-a:0,per=Number(r?.fare_per_stop||0),mult=Number($('saleFare').value||1),qty=Math.max(1,Math.min(20,Number($('saleQty').value)||1));
  const total=stops*per*mult*qty;
  $('stopCount').textContent=valid?stops:'—';$('farePerStop').textContent=r?money(per):'—';$('saleTotal').textContent=money(total);
@@ -48,7 +49,8 @@ function renderInfo(){
  const route=activeTripRoute(),vehicle=activeVehicle();
  $('gameClock').textContent=currentShift?.game_time||$('tripGameTime').value||'—';
  $('infoRoute').textContent=route?route.name:'—';$('infoVehicle').textContent=vehicle?(vehicle.number+' · '+vehicle.model):(currentShift?.vehicle_label||'—');
- $('infoGameTime').textContent=currentShift?.game_time||'—';if($('liveRoute'))$('liveRoute').value=currentShift?.route_id||'';if($('liveRouteControls'))$('liveRouteControls').style.display=currentShift?'grid':'none';$('cashContext').textContent=currentShift?(route?'Рейс '+route.name+' · ':'Смена открыта · ')+(vehicle?.number||currentShift.vehicle_label||''):'Смена не открыта';
+ $('infoGameTime').textContent=currentShift?.game_time||'—';if($('liveRoute'))$('liveRoute').value=currentShift?.route_id||'';if($('liveRouteControls'))$('liveRouteControls').style.display=currentShift?'grid':'none';
+ const activeStops=activeTripRoute()?.stops||[],cur=Number(currentShift?.current_stop_index||0);$('infoCurrentStop').textContent=currentShift&&activeStops[cur]?activeStops[cur]:'—';$('infoNextStop').textContent=currentShift&&activeStops[cur+1]?activeStops[cur+1]:'—';$('cashContext').textContent=currentShift?(route?'Рейс '+route.name+' · ':'Смена открыта · ')+(vehicle?.number||currentShift.vehicle_label||''):'Смена не открыта';
  $('shiftBadge').textContent=currentShift?'Смена открыта':'Смена закрыта';$('shiftBadge').className='shift-badge '+(currentShift?'open':'closed');
  $('startShift').disabled=!!currentShift;$('endShift').disabled=!currentShift;
 }
