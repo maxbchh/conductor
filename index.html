@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#edf2fa"><title>Conductor — касса кондуктора</title>
+<meta name="theme-color" content="#edf2fa"><title>Кондуктор — кассовая система</title>
 <link rel="stylesheet" href="./styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
@@ -11,7 +11,7 @@
 <body>
 <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
 <header class="topbar glass">
- <a class="brand" href="#"><span class="brand-mark">C</span><span><b>Conductor</b><small>Кассовая система</small></span></a>
+ <a class="brand" href="#"><span class="brand-mark">К</span><span><b>Кондуктор</b><small>Кассовая система</small></span></a>
  <div class="clock-group"><div><small>ОБЫЧНОЕ ВРЕМЯ</small><b id="realClock">--:--:--</b></div><i></i><div><small>ИГРОВОЕ ВРЕМЯ</small><b id="gameClock">--:--:--</b><small id="gameDate" class="game-clock-date">--.--.----</small></div></div>
  <div class="top-actions"><span id="cloudState" class="cloud-state"><i></i> Подключение…</span><span id="shiftBadge" class="shift-badge closed">Смена закрыта</span></div>
 </header>
@@ -68,7 +68,7 @@
  <div class="page-heading"><div><p class="eyebrow">СИМУЛЯЦИЯ ВРЕМЕНИ</p><h1>Игровое время</h1><p class="muted">Управление временем мира — как в OMSI 2</p></div><span class="context-chip">Общее для всех устройств</span></div>
  <div class="game-clock-workspace">
   <section class="game-clock-hero glass">
-   <div class="game-clock-hero-top"><span class="game-clock-live"><i id="gameClockDot" class="game-clock-dot"></i><span id="gameClockStatus">Подключение часов…</span></span><span class="game-clock-world">CONDUCTOR WORLD CLOCK</span></div>
+   <div class="game-clock-hero-top"><span class="game-clock-live"><i id="gameClockDot" class="game-clock-dot"></i><span id="gameClockStatus">Подключение часов…</span></span><span class="game-clock-world">МИРОВОЕ ИГРОВОЕ ВРЕМЯ</span></div>
    <div class="game-clock-digital"><span id="gameClockLarge">08:00:00</span><small id="gameClockLargeDate">Дата загружается…</small></div>
    <div class="game-clock-main-actions"><button id="gameClockPause" class="primary-btn" type="button" disabled>Ⅱ Остановить время</button><label class="game-clock-rate"><span>Скорость игрового времени</span><select id="gameClockRate" disabled><option value="0.25">0,25× · очень медленно</option><option value="0.5">0,5× · медленно</option><option value="1" selected>1× · обычная</option><option value="2">2× · быстро</option><option value="4">4× · ускоренно</option><option value="8">8× · очень быстро</option><option value="16">16× · перемотка</option></select></label></div>
   </section>
