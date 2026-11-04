@@ -28,3 +28,5 @@ select option{background:#f5f8ff;color:#1c2a40}
 .pay-success{background:#e3f8ed;color:#137c4b;border:1px solid #a7e4c2}
 .pay-fail{background:#fff0f0;color:#a92e3a;border:1px solid #f1b6bc}
 @media(max-width:560px){.phone-pay-panel{padding:17px}.phone-pay-main{margin:18px auto}}
+
+.cash-shift-panel{max-width:860px;margin-bottom:16px}.cash-shift-panel .trip-actions{margin-top:12px}
