@@ -5,6 +5,7 @@
 <meta name="theme-color" content="#edf2fa"><title>Conductor — касса кондуктора</title>
 <link rel="stylesheet" href="./styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script defer src="./app.js"></script>
 </head>
 <body>
@@ -17,7 +18,7 @@
 <nav class="tabs glass">
  <button class="tab active" data-tab="cash"><span>▦</span> Касса</button>
  <button class="tab" data-tab="trips"><span>↗</span> Рейсы</button>
- <button class="tab" data-tab="database"><span>▤</span> База данных</button>
+ <button class="tab" data-tab="database"><span>▤</span> База данных</button><button class="tab" data-tab="schedules"><span>▤</span> Расписание</button>
 </nav>
 <main>
 <section id="view-cash" class="view active">
@@ -26,7 +27,7 @@
   <div class="glass panel sale-panel">
    <div class="panel-head"><div><p class="eyebrow">НОВАЯ ПРОДАЖА</p><h2>Параметры билета</h2></div><span class="step-pill">01 / 03</span></div>
    <div class="field-grid">
-    <label class="field full"><span>Маршрут</span><select id="saleRoute"></select></label>
+    <label class="field full"><span>Маршрут</span><select id="saleRoute"></select></label><div class="field full"><span>QR-код</span><button id="scanQr" class="secondary-btn" type="button">▦ Сканировать QR-код</button></div>
     <label class="field"><span>Откуда</span><select id="saleFrom"></select></label>
     <label class="field"><span>Куда</span><select id="saleTo"></select></label>
     <label class="field"><span>Тариф</span><select id="saleFare"><option value="1">Полный · 100%</option><option value=".5">Льготный · 50%</option><option value=".75">Школьный · 75%</option></select></label>
@@ -47,7 +48,7 @@
  <div class="page-heading"><div><p class="eyebrow">УПРАВЛЕНИЕ СМЕНОЙ</p><h1>Рейсы</h1><p class="muted">Назначение подвижного состава и игрового времени</p></div></div>
  <div class="glass panel trip-setup"><div class="panel-head"><div><p class="eyebrow">НОВАЯ СМЕНА</p><h2>Назначение рейса</h2></div><span class="step-pill">НАСТРОЙКА</span></div>
   <div class="field-grid">
-   <label class="field"><span>Город / парк</span><select id="tripCity"><option>Тверь</option><option>Новоозёрск</option></select></label>
+   <label class="field"><span>Город / парк</span><select id="tripCity"><option>Тверь</option></select></label>
    <label class="field"><span>Маршрут</span><select id="tripRoute"></select></label>
    <label class="field"><span>Подвижной состав</span><select id="tripVehicle"></select></label>
    <label class="field"><span>Игровое время</span><input id="tripGameTime" type="time" value="08:00"></label>
@@ -57,6 +58,7 @@
  </div>
  <div class="glass panel"><div class="panel-head"><div><p class="eyebrow">ИСТОРИЯ</p><h2>Последние рейсы</h2></div></div><div id="shiftHistory" class="empty-state">Рейсов пока нет</div></div>
 </section>
+<section id="view-schedules" class="view"><div class="page-heading"><div><p class="eyebrow">АРХИВ ДВИЖЕНИЯ</p><h1>Расписание</h1><p class="muted">Папки маршрутов и текстовые расписания города Твери</p></div><button id="addScheduleFolder" class="primary-btn compact" type="button">＋ Новая папка</button></div><div id="scheduleFolders" class="schedule-folders"></div><div id="scheduleEntries" class="glass panel"><div class="empty-state">Выбери папку маршрута</div></div></section>
 <section id="view-database" class="view">
  <div class="page-heading"><div><p class="eyebrow">СПРАВОЧНИКИ</p><h1>База данных</h1><p class="muted">Подвижной состав, маршруты и история билетов</p></div></div>
  <div class="db-tabs"><button class="db-tab active" data-dbtab="fleet">Автобусный парк</button><button class="db-tab" data-dbtab="routes">Маршруты</button><button class="db-tab" data-dbtab="tickets">Билеты</button></div>
