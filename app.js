@@ -6,9 +6,9 @@ const $=id=>document.getElementById(id);
 const money=n=>Number(n||0).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' BYN';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=p=>p+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);
-let db={routes:[],vehicles:[],shifts:[],tickets:[],schedules:[]},activeScheduleFolder=null,client=null,currentShift=null,lastTicket=null,toastTimer;
+let db={routes:[],vehicles:[],shifts:[],tickets:[],schedules:[],cards:[]},activeScheduleFolder=null,client=null,currentShift=null,lastTicket=null,toastTimer;
 const statusOptions=['В эксплуатации','На рейсе','Не в эксплуатации','Ремонт','Капитальный ремонт','Списан','Выведен из эксплуатации'];
-function toast(s){const el=$('toast');el.textContent=s;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2600)}
+function toast(s,type=''){const el=$('toast');el.textContent=s;el.className='toast show '+type;clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3000)}
 function setCloud(s,cls){$('cloudState').className='cloud-state '+cls;$('cloudState').innerHTML='<i></i> '+s}
 function showModal(html){$('modalContent').innerHTML=html;$('modalLayer').classList.add('open');$('modalLayer').setAttribute('aria-hidden','false')}
 function closeModal(){$('modalLayer').classList.remove('open');$('modalLayer').setAttribute('aria-hidden','true')}
@@ -21,16 +21,19 @@ function renderRouteSelects(){
  const routes=db.routes.filter(r=>r.city===city);
  const opts=routes.map(r=>({value:r.id,label:r.name+' · '+r.city}));
  const previous=$('tripRoute').value;fillSelect($('tripRoute'),opts,'Выберите маршрут');if(routes.some(r=>r.id===previous))$('tripRoute').value=previous;
- const saleOpts=db.routes.map(r=>({value:r.id,label:r.name+' · '+r.city}));
- const old=$('saleRoute').value;fillSelect($('saleRoute'),saleOpts,'Выберите маршрут');if(currentShift&&db.routes.some(r=>r.id===currentShift.route_id))$('saleRoute').value=currentShift.route_id;else if(db.routes.some(r=>r.id===old))$('saleRoute').value=old;
+ const saleOpts=db.routes.filter(r=>r.city==='Тверь').map(r=>({value:r.id,label:r.name}));
+ const old=$('saleRoute').value;fillSelect($('saleRoute'),saleOpts,'Выберите маршрут');if(currentShift&&currentShift.route_id&&db.routes.some(r=>r.id===currentShift.route_id))$('saleRoute').value=currentShift.route_id;else if(db.routes.some(r=>r.id===old))$('saleRoute').value=old;
  updateSaleStops();renderVehicleSelect();renderInfo();
 }
 function updateSaleStops(){
  const r=activeRoute(),from=$('saleFrom'),to=$('saleTo');
  const oldFrom=from.value,oldTo=to.value;
- fillSelect(from,(r?.stops||[]).map((s,i)=>({value:String(i),label:(i+1)+'. '+s})),'Начальная остановка');
- fillSelect(to,(r?.stops||[]).map((s,i)=>({value:String(i),label:(i+1)+'. '+s})),'Конечная остановка');
- if(r&&oldFrom!=='')from.value=oldFrom;if(r&&oldTo!=='')to.value=oldTo;
+ const start=currentShift?Number(currentShift.current_stop_index||0):(oldFrom!==''?Number(oldFrom):0);
+ fillSelect(from,(r?.stops||[]).map((s,i)=>({value:String(i),label:s})),'Выберите остановку');
+ fillSelect(to,(r?.stops||[]).map((s,i)=>({value:String(i),label:s})).filter(x=>Number(x.value)>start),'Выберите остановку');
+ if(r&&start>=0&&start<r.stops.length)from.value=String(start);
+ if(r&&oldTo!==''&&Number(oldTo)>start)to.value=oldTo;
+ from.disabled=!!currentShift;
  updateFare();
 }
 function updateFare(){
@@ -49,8 +52,8 @@ function renderVehicleSelect(){
 function renderInfo(){
  const route=activeTripRoute(),vehicle=activeVehicle();
  $('gameClock').textContent=currentShift?.game_time||$('tripGameTime').value||'—';
- $('infoRoute').textContent=route?route.name:'—';$('infoVehicle').textContent=vehicle?(vehicle.number+' · '+vehicle.model):'—';
- $('infoGameTime').textContent=currentShift?.game_time||'—';$('cashContext').textContent=currentShift?'Рейс '+(route?.name||'')+' · '+(vehicle?.number||''):'Смена не открыта';
+ $('infoRoute').textContent=route?route.name:'—';$('infoVehicle').textContent=vehicle?(vehicle.number+' · '+vehicle.model):(currentShift?.vehicle_label||'—');
+ $('infoGameTime').textContent=currentShift?.game_time||'—';if($('liveRoute'))$('liveRoute').value=currentShift?.route_id||'';if($('liveRouteControls'))$('liveRouteControls').style.display=currentShift?'grid':'none';$('cashContext').textContent=currentShift?(route?'Рейс '+route.name+' · ':'Смена открыта · ')+(vehicle?.number||currentShift.vehicle_label||''):'Смена не открыта';
  $('shiftBadge').textContent=currentShift?'Смена открыта':'Смена закрыта';$('shiftBadge').className='shift-badge '+(currentShift?'open':'closed');
  $('startShift').disabled=!!currentShift;$('endShift').disabled=!currentShift;
 }
@@ -69,12 +72,14 @@ function renderRoutes(){
  const city=$('routesCity').value||'Тверь',rows=db.routes.filter(r=>r.city===city);
  $('routesList').innerHTML=rows.length?'<table><thead><tr><th>Маршрут</th><th>Остановки</th><th>Цена за остановку</th><th></th></tr></thead><tbody>'+rows.map(r=>'<tr><td><span class="row-title">'+esc(r.name)+'</span><span class="subtext">'+esc(r.city)+'</span></td><td>'+((r.stops||[]).length)+' остановок</td><td>'+money(r.fare_per_stop)+'</td><td><button class="table-action" data-edit-route="'+esc(r.id)+'">Изменить</button></td></tr>').join('')+'</tbody></table>':'<div class="empty-state">Маршруты не найдены</div>';
 }
+function renderCards(){const el=$('cardsList');if(!el)return;el.innerHTML=db.cards.length?db.cards.map(c=>'<div class="card-row"><div><b>'+esc(c.holder)+'</b><div class="subtext">'+esc(c.label)+'</div><div class="card-balance">Баланс: '+money(c.balance)+'</div></div><button class="table-action" data-edit-card="'+esc(c.id)+'">Изменить баланс</button></div>').join(''):'<div class="empty-state">Виртуальных карт пока нет</div>'}
+function openCardEditor(card){const edit=!!card;showModal('<p class="eyebrow">ВИРТУАЛЬНАЯ КАРТА</p><h2>'+(edit?'Настроить карту':'Новая карта')+'</h2><div class="field-grid"><label class="field full"><span>Имя владельца</span><input id="cardHolder" value="'+esc(card?.holder||'')+'"></label><label class="field full"><span>Название карты</span><input id="cardLabel" value="'+esc(card?.label||'Карта Conductor')+'"></label><label class="field full"><span>Баланс (BYN)</span><input id="cardBalance" type="number" min="0" step=".01" value="'+esc(card?.balance??0)+'"></label></div><div class="modal-actions"><button id="saveCard" class="primary-btn">Сохранить</button></div>');$('saveCard').onclick=async()=>{const p={holder:$('cardHolder').value.trim(),label:$('cardLabel').value.trim(),balance:Math.max(0,Number($('cardBalance').value)||0)};if(!p.holder||!p.label){toast('Заполни имя и название карты','error');return}try{const q=edit?await client.from('conductor_cards').update(p).eq('id',card.id).select().single():await client.from('conductor_cards').insert({...p,id:uid('card')}).select().single();if(q.error)throw q.error;if(edit)db.cards=db.cards.map(x=>x.id===card.id?q.data:x);else db.cards.push(q.data);closeModal();renderCards();toast('Виртуальная карта сохранена','success')}catch(e){toast('Ошибка карты: '+e.message,'error')}}}
 function renderTickets(){
  const rows=[...db.tickets].sort((a,b)=>b.ticket_number-a.ticket_number).slice(0,100);
  $('ticketCount').textContent=db.tickets.length+' билетов';
  $('ticketsList').innerHTML=rows.length?'<table><thead><tr><th>Билет</th><th>Маршрут</th><th>Откуда → Куда</th><th>Тариф</th><th>Оплата</th><th>Сумма</th></tr></thead><tbody>'+rows.map(t=>'<tr><td><b>#'+t.ticket_number+'</b><span class="subtext">'+new Date(t.issued_at).toLocaleString('ru-RU')+'</span></td><td>'+esc(t.route_name||'—')+'</td><td>'+esc(t.from_stop)+' → '+esc(t.to_stop)+'</td><td>'+esc(t.fare_type)+'</td><td>'+esc(t.payment_method==='card'?'Карта':'Наличные')+'</td><td><b>'+money(t.amount)+'</b></td></tr>').join('')+'</tbody></table>':'<div class="empty-state">Проданных билетов пока нет</div>';
 }
-function syncTripStops(){const r=db.routes.find(x=>x.id===$('tripRoute').value);if(!r)return;['tripCurrentStop','tripEndStop','liveCurrentStop'].forEach(id=>{const el=$(id);if(el)el.innerHTML=r.stops.map((s,i)=>'<option value="'+i+'">'+(i+1)+'. '+esc(s)+'</option>').join('')});if($('tripEndStop'))$('tripEndStop').value=String(r.stops.length-1);if(currentShift&&$('liveCurrentStop'))$('liveCurrentStop').value=String(currentShift.current_stop_index||0)}
+function syncTripStops(){const r=db.routes.find(x=>x.id===$('liveRoute')?.value);if(!r)return;for(const id of ['liveCurrentStop','liveEndStop']){const el=$(id);if(el)el.innerHTML=r.stops.map((s,i)=>'<option value="'+i+'">'+esc(s)+'</option>').join('')}if(currentShift){$('liveCurrentStop').value=String(currentShift.current_stop_index||0);$('liveEndStop').value=String(currentShift.end_stop_index??r.stops.length-1)}}
 function renderHistory(){
  const rows=[...db.shifts].sort((a,b)=>new Date(b.started_at)-new Date(a.started_at)).slice(0,20);
  $('shiftHistory').innerHTML=rows.length?'<div class="table-wrap"><table><thead><tr><th>Маршрут</th><th>Состав</th><th>Игровое время</th><th>Статус</th><th>Начало</th></tr></thead><tbody>'+rows.map(s=>{const r=db.routes.find(x=>x.id===s.route_id),v=db.vehicles.find(x=>x.id===s.vehicle_id);return '<tr><td>'+esc(r?.name||'—')+'</td><td>'+esc(v?.number||'—')+'</td><td>'+esc(s.game_time||'—')+'</td><td><span class="status-tag '+(s.status==='open'?'active':'')+'">'+(s.status==='open'?'Открыт':'Завершён')+'</span></td><td>'+new Date(s.started_at).toLocaleString('ru-RU')+'</td></tr>'}).join('')+'</tbody></table></div>':'<div class="empty-state">Рейсов пока нет</div>';
@@ -86,7 +91,7 @@ function renderTicket(t){
  const route=db.routes.find(r=>r.id===t.route_id),from=route?route.stops.indexOf(t.from_stop):0,to=route?route.stops.indexOf(t.to_stop):Math.max(1,Number(t.stop_count)||1);
  if(window.QRCode)new QRCode($('ticketQr'),{text:'CONDUCTOR|'+t.route_id+'|'+Math.max(0,from)+'|'+Math.max(1,to),width:76,height:76,correctLevel:QRCode.CorrectLevel.M});
 }
-function renderAll(){renderRouteSelects();renderFleet();renderRoutes();renderTripRoutes();renderTickets();renderHistory();renderStats();renderInfo();renderSchedules()}
+function renderAll(){renderRouteSelects();renderFleet();renderRoutes();renderTripRoutes();renderTickets();renderHistory();renderStats();renderInfo();renderSchedules();renderCards()}
 
 function renderSchedules(){
  const folders=[...new Set(db.schedules.map(s=>s.folder))].sort((a,b)=>a.localeCompare(b,'ru'));
@@ -180,15 +185,16 @@ async function endShift(){
 }
 async function loadData(){
  setCloud('Загрузка базы…','');
- const [r,v,s,t,sch]=await Promise.all([
+ const [r,v,s,t,sch,cards]=await Promise.all([
   client.from('conductor_routes').select('*').order('city').order('name'),
   client.from('conductor_vehicles').select('*').order('city').order('number'),
   client.from('conductor_shifts').select('*').order('started_at',{ascending:false}).limit(100),
   client.from('conductor_tickets').select('*').order('ticket_number',{ascending:false}).limit(500),
-  client.from('conductor_schedules').select('*').order('folder').order('title')
+  client.from('conductor_schedules').select('*').order('folder').order('title'),
+  client.from('conductor_cards').select('*').order('holder')
  ]);
- for(const x of [r,v,s,t,sch])if(x.error)throw x.error;
- db={routes:(r.data||[]).filter(x=>x.city==='Тверь'),vehicles:(v.data||[]).filter(x=>x.city==='Тверь'),shifts:s.data||[],tickets:t.data||[],schedules:sch.data||[]};
+ for(const x of [r,v,s,t,sch,cards])if(x.error)throw x.error;
+ db={routes:(r.data||[]).filter(x=>x.city==='Тверь'),vehicles:(v.data||[]).filter(x=>x.city==='Тверь'),shifts:s.data||[],tickets:t.data||[],schedules:sch.data||[],cards:cards.data||[]};
  currentShift=db.shifts.find(s=>s.status==='open')||null;
  if(currentShift){const active= db.shifts.filter(s=>s.status==='open');if(active.length>1){console.warn('Several open shifts detected; using newest.')}} 
  setCloud('База синхронизирована','ok');renderAll();
