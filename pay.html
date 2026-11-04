@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#edf2fa"><title>Conductor · Покупка билета</title>
+<link rel="stylesheet" href="./styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+<header class="topbar glass"><a class="brand" href="./"><span class="brand-mark">C</span><span><b>Conductor</b><small>Покупка билета</small></span></a><span class="shift-badge open" id="payStatus">Подключение…</span></header>
+<main class="phone-pay-main">
+ <div class="page-heading"><div><p class="eyebrow">БИЛЕТ ПО QR-КОДУ</p><h1>Выбор поездки</h1><p class="muted">Выбери маршрут, остановку назначения и способ оплаты</p></div></div>
+ <section class="glass panel phone-pay-panel">
+  <div class="field-grid">
+   <label class="field full"><span>Маршрут</span><select id="payRoute"><option value="">Загрузка…</option></select></label>
+   <label class="field"><span>Отправление</span><select id="payFrom" disabled></select></label>
+   <label class="field"><span>Куда</span><select id="payTo"></select></label>
+   <label class="field"><span>Тариф</span><select id="payFare"><option value="1">Полный · 100%</option><option value=".75">Школьный · 75%</option><option value=".5">Льготный · 50%</option></select></label>
+   <label class="field"><span>Количество</span><input id="payQty" type="number" min="1" max="20" value="1"></label>
+  </div>
+  <div class="fare-summary"><div><small>Остановок</small><b id="payStops">—</b></div><div><small>За остановку</small><b id="payPer">—</b></div><div class="sum"><small>Итого</small><b id="payTotal">0,00 BYN</b></div></div>
+  <label class="field"><span>Виртуальная карта</span><select id="payCard"><option value="">Выбери карту для оплаты</option></select></label>
+  <div class="payment-methods"><button id="payCash" class="primary-btn" type="button">Наличными</button><button id="payByCard" class="secondary-btn" type="button">Оплатить картой</button></div>
+  <p class="hint">Виртуальная карта — игровая симуляция с балансом из базы Conductor. Это не банковская карта и не настоящий платёж.</p>
+  <div id="payResult" class="pay-result" aria-live="polite"></div>
+ </section>
+ <p class="hint phone-pay-foot"><a href="./">Вернуться в кассу Conductor</a></p>
+</main>
+<div id="payToast" class="toast"></div>
+<script>
+(()=>{
+'use strict';
+const URL='https://yycaxmfljqzfkjukplkz.supabase.co',KEY='sb_publishable_Ur6yP5_7LQ-9DGmriBJIpw_zIWJiM7T';
+const $=id=>document.getElementById(id),params=new URLSearchParams(location.search),shiftId=params.get('shift'),routeParam=params.get('route');
+const client=window.supabase.createClient(URL,KEY,{auth:{persistSession:false}});
+let shift=null,routes=[],cards=[],route=null;
+const money=n=>Number(n||0).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' BYN';
+function toast(s,type=''){const el=$('payToast');el.textContent=s;el.className='toast show '+type;setTimeout(()=>el.classList.remove('show'),3500)}
+function fill(el,items,placeholder){el.innerHTML='<option value="">'+placeholder+'</option>';items.forEach(x=>{const o=document.createElement('option');o.value=x.value;o.textContent=x.label;el.appendChild(o)})}
+function updateStops(){
+ route=routes.find(r=>r.id===$('payRoute').value)||null;
+ const start=route?Math.max(0,Math.min(Number(shift.current_stop_index||0),route.stops.length-1)):0;
+ fill($('payFrom'),(route?.stops||[]).map((s,i)=>({value:String(i),label:s})),'—');fill($('payTo'),(route?.stops||[]).map((s,i)=>({value:String(i),label:s})).filter(x=>Number(x.value)>start),'Выбери остановку');
+ if(route){$('payFrom').value=String(start);$('payFrom').disabled=true}
+ updateTotal();
+}
+function updateTotal(){
+ const r=routes.find(x=>x.id===$('payRoute').value),a=Number($('payFrom').value),b=Number($('payTo').value),valid=!!r&&Number.isInteger(a)&&Number.isInteger(b)&&b>a;
+ const count=valid?b-a:0,qty=Math.max(1,Math.min(20,Number($('payQty').value)||1)),mult=Number($('payFare').value||1),per=Number(r?.fare_per_stop||0),total=count*qty*mult*per;
+ $('payStops').textContent=valid?count:'—';$('payPer').textContent=r?money(per):'—';$('payTotal').textContent=money(total);
+ return {r,a,b,count,qty,mult,per,total,valid};
+}
+async function finish(method){
+ const x=updateTotal();if(!shift||shift.status!=='open'){toast('Смена уже закрыта','error');return}
+ if(!x.valid){toast('Выбери маршрут и остановку назначения','error');return}
+ const btn=method==='cash'?$('payCash'):$('payByCard');btn.disabled=true;btn.textContent='Проверка…';
+ try{
+  const fare=x.mult===.5?'Льготный':x.mult===.75?'Школьный':'Полный';
+  const rows=Array.from({length:x.qty},()=>({shift_id:shift.id,route_id:x.r.id,route_name:x.r.name,from_stop:x.r.stops[x.a],to_stop:x.r.stops[x.b],stop_count:x.count,fare_type:fare,fare_multiplier:x.mult,fare_per_stop:x.per,amount:Number((x.count*x.per*x.mult).toFixed(2)),payment_method:method,cash_received:method==='cash'?Number((x.total/x.qty).toFixed(2)):Number((x.total/x.qty).toFixed(2)),change_due:0,game_time:shift.game_time}));
+  let tickets;
+  if(method==='card'){
+   const cardId=$('payCard').value;if(!cardId)throw new Error('Выбери виртуальную карту');
+   const result=await client.rpc('conductor_charge_virtual_card',{p_card_id:cardId,p_ticket_rows:rows});
+   if(result.error)throw result.error;if(!result.data?.ok)throw new Error('Недостаточно средств на карте');
+   tickets=result.data.tickets;
+   const c=await client.from('conductor_cards').select('*').eq('id',cardId).single();if(!c.error)$('payCard').querySelector('option[value="'+CSS.escape(cardId)+'"]').textContent=c.data.holder+' · '+money(c.data.balance);
+  }else{
+   const result=await client.from('conductor_tickets').insert(rows).select('*');if(result.error)throw result.error;tickets=result.data;
+  }
+  $('payResult').innerHTML='<div class="pay-success">Оплата прошла успешно · билет № '+tickets[0].ticket_number+'</div>';toast('Оплата прошла успешно','success');$('payCash').disabled=true;$('payByCard').disabled=true;
+ }catch(e){$('payResult').innerHTML='<div class="pay-fail">'+e.message+'</div>';toast('Оплата не прошла: '+e.message,'error');btn.disabled=false;btn.textContent=method==='cash'?'Наличными':'Оплатить картой'}
+}
+async function init(){
+ if(!shiftId){$('payStatus').textContent='QR-код без номера смены';toast('Неверная ссылка','error');return}
+ try{
+  const [s,r,c]=await Promise.all([client.from('conductor_shifts').select('*').eq('id',shiftId).single(),client.from('conductor_routes').select('*').eq('city','Тверь').order('name'),client.from('conductor_cards').select('*').order('holder')]);
+  if(s.error)throw s.error;if(r.error)throw r.error;if(c.error)throw c.error;
+  shift=s.data;if(shift.status!=='open')throw new Error('Эта смена уже закрыта');
+  routes=r.data||[];cards=c.data||[];
+  fill($('payRoute'),routes.map(x=>({value:x.id,label:x.name})),'Выбери маршрут');
+  if(routeParam&&routes.some(x=>x.id===routeParam))$('payRoute').value=routeParam;else if(shift.route_id)$('payRoute').value=shift.route_id;
+  fill($('payCard'),cards.map(x=>({value:x.id,label:x.holder+' · '+money(x.balance)})),'Выбери карту для оплаты');
+  $('payRoute').onchange=updateStops;$('payTo').onchange=updateTotal;$('payFare').onchange=updateTotal;$('payQty').oninput=updateTotal;
+  $('payCash').onclick=()=>finish('cash');$('payByCard').onclick=()=>finish('card');
+  updateStops();$('payStatus').textContent='Смена открыта';$('payStatus').className='shift-badge open';
+ }catch(e){$('payStatus').textContent='Нет активной смены';toast(e.message,'error')}
+}
+init();
+})();
+</script>
+</body></html>
