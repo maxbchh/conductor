@@ -51,10 +51,10 @@
    <label class="field"><span>Город / парк</span><select id="tripCity"><option>Тверь</option></select></label>
    <label class="field"><span>Маршрут</span><select id="tripRoute"></select></label>
    <label class="field"><span>Подвижной состав</span><select id="tripVehicle"></select></label>
-   <label class="field"><span>Игровое время</span><input id="tripGameTime" type="time" value="08:00"></label>
+   <label class="field"><span>Игровое время</span><input id="tripGameTime" type="time" value="08:00"></label><label class="field"><span>Отправление с остановки</span><select id="tripCurrentStop"></select></label><label class="field"><span>Неполный рейс до</span><select id="tripEndStop"></select></label>
   </div>
   <div class="trip-actions"><button id="startShift" class="primary-btn" type="button">Открыть смену и начать рейс →</button><button id="endShift" class="danger-btn" type="button" disabled>Завершить смену</button></div>
-  <p class="hint">Автобус автоматически получает статус «На рейсе». После завершения смены возвращается к предыдущему статусу.</p>
+  <label class="field"><span>Текущая остановка в рейсе</span><select id="liveCurrentStop"></select></label><p class="hint">Можно указать неполный рейс и обновлять текущую остановку по ходу движения.</p>
  </div>
  <div class="glass panel"><div class="panel-head"><div><p class="eyebrow">ИСТОРИЯ</p><h2>Последние рейсы</h2></div></div><div id="shiftHistory" class="empty-state">Рейсов пока нет</div></div>
 </section>
