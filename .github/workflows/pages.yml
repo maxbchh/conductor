@@ -21,7 +21,7 @@ jobs:
       - name: Check JavaScript syntax
         run: node --check app.js
       - name: Check required app files
-        run: test -s index.html && test -s styles.css && test -s app.js && test -s supabase/schema.sql
+        run: test -s index.html && test -s styles.css && test -s app.js && test -s pay.html && test -s supabase/schema.sql
   deploy:
     needs: validate
     environment:
