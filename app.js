@@ -65,9 +65,9 @@ function renderRouteSelects(){
 }
 function updateSaleStops(){
  const r=activeRoute(),from=$('saleFrom'),to=$('saleTo'),oldFrom=from.value,oldTo=to.value,start=currentShift?Number(currentShift.current_stop_index||0):Math.max(0,Number(oldFrom||0));
- fillSelect(from,(r?.stops||[]).map((s,i)=>({value:String(i),label:s})),'Остановка отправления');
+ fillSelect(from,(r?.stops||[]).map((s,i)=>({value:String(i),label:s})), '');
  const end=currentShift&&currentShift.end_stop_index!=null?Number(currentShift.end_stop_index):((r?.stops?.length||1)-1);
- fillSelect(to,(r?.stops||[]).map((s,i)=>({value:String(i),label:s})).filter(x=>Number(x.value)>start&&Number(x.value)<=end),'Остановка назначения');
+ fillSelect(to,(r?.stops||[]).map((s,i)=>({value:String(i),label:s})).filter(x=>Number(x.value)>start&&Number(x.value)<=end), '');
  if(r&&start<r.stops.length)from.value=String(currentShift?start:(oldFrom!==''&&Number(oldFrom)<r.stops.length?oldFrom:'0'));
  if(r&&oldTo!==''&&Number(oldTo)>start)to.value=oldTo;
  from.disabled=!!currentShift;updateFare();
