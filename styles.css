@@ -255,3 +255,17 @@ main{min-width:0}
 .schedule-direction.active{background:#e7f0ff;border-color:#91b8ff;color:#3475df}
 .schedule-entry pre{white-space:pre-wrap;overflow-wrap:anywhere}
 #tripScheduleFolder,#tripSchedule{min-width:0}
+
+
+/* Navigation polish: clean glass tabs and consistently centered icons */
+.tabs{background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;padding:0!important;gap:8px!important}
+.tab{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-align:center;min-height:42px;padding:10px 19px!important;border:1px solid rgba(255,255,255,.7)!important;background:rgba(255,255,255,.48)!important;box-shadow:0 7px 22px rgba(51,77,120,.07),inset 0 1px 0 rgba(255,255,255,.8)!important;backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%)}
+.tab span{display:inline-flex;align-items:center;justify-content:center;margin:0!important;line-height:1;font-size:16px}
+.tab.active{background:linear-gradient(130deg,#5793fa,#3976e8)!important;border-color:transparent!important;box-shadow:0 7px 20px #3978ed38!important}
+.news-item{overflow:hidden;padding:0 0 18px!important}
+.news-item>.eyebrow,.news-item>h2,.news-item>p,.news-item>.table-action{margin-left:20px;margin-right:20px}
+.news-item>.eyebrow{margin-top:18px}
+.news-image{display:block;width:100%;max-height:390px;aspect-ratio:16/9;object-fit:cover;border-radius:17px 17px 0 0;background:#eaf0f8}
+.news-upload-preview{display:block;width:100%;max-height:260px;aspect-ratio:16/9;object-fit:cover;border-radius:14px;border:1px solid #e2eaf6;background:#f3f6fb}
+.news-upload-preview[hidden]{display:none}
+@media(max-width:700px){.tabs{gap:6px!important}.tab{padding:10px 13px!important;min-height:40px}.news-image{max-height:260px}}
