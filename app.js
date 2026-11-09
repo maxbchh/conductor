@@ -260,7 +260,7 @@ function openRouteEditor(r){
  const pairId=r?.pair_id||null;
  const other=edit&&pairId?db.routes.find(x=>x.id!==r.id&&x.pair_id===pairId&&!x.archived_at):null;
  const isReturn=!!(r&&(r.direction==='return'||String(r.name||'').toLowerCase().endsWith(suffix)));
- const baseName=(r?.name||'').replace(/\s*\\(обратный\\)$/i,'').trim();
+ const baseName=(r?.name||'').replace(/\s*\(обратный\)$/i,'').trim();
  const primaryStops=(r?.stops||[]);
  const reverseStops=other?.stops||(r?([...primaryStops].reverse()):[]);
  const hasReverse=!!other;
@@ -290,7 +290,7 @@ function openRouteEditor(r){
   const stops=$('rStops').value.split(/[;\n]+/).map(s=>s.trim()).filter(Boolean);
   const reverseList=$('rReverseStops').value.split(/[;\n]+/).map(s=>s.trim()).filter(Boolean);
   const typedName=$('rName').value.trim();
-  const name=typedName.replace(/\s*\\(обратный\\)$/i,'').trim();
+  const name=typedName.replace(/\s*\(обратный\)$/i,'').trim();
   const fare=Math.max(0,Number($('rFare').value)||0);
   if(!name||stops.length<2){toast('Укажи название маршрута и минимум две остановки','error');return}
   if(includeReverse&&(!reverseToggle.checked||reverseList.length<2)){
