@@ -648,3 +648,49 @@ begin
     );
 end;
 $$;
+
+
+-- Ticket sales are allowed during an open cash shift even when no driver shift is active.
+-- If a driver shift is attached, it must still be open.
+create or replace function public.conductor_validate_ticket_shifts()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_driver_status text;
+  v_cash_status text;
+begin
+  if new.cash_shift_id is null then
+    raise exception 'An open cash shift is required for ticket sales' using errcode='23514';
+  end if;
+
+  select status into v_cash_status
+  from public.conductor_cash_shifts
+  where id = new.cash_shift_id
+  for share;
+  if v_cash_status is distinct from 'open' then
+    raise exception 'Cash shift is closed or does not exist' using errcode='23514';
+  end if;
+
+  if new.shift_id is not null then
+    select status into v_driver_status
+    from public.conductor_shifts
+    where id = new.shift_id
+    for share;
+    if v_driver_status is distinct from 'open' then
+      raise exception 'Driver shift is closed or does not exist' using errcode='23514';
+    end if;
+  end if;
+
+  if new.route_id is not null and exists (
+    select 1 from public.conductor_routes
+    where id = new.route_id and archived_at is not null
+  ) then
+    raise exception 'Archived routes cannot be used for ticket sales' using errcode='23514';
+  end if;
+
+  return new;
+end;
+$$;
