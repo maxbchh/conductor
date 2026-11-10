@@ -6,7 +6,7 @@ const $=id=>document.getElementById(id);
 const money=n=>Number(n||0).toLocaleString('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2})+' BYN';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uid=p=>p+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);
-let db={routes:[],vehicles:[],shifts:[],tickets:[],schedules:[],cards:[],cardTransactions:[],cashShifts:[],news:[]},activeScheduleFolder=null,client=null,currentShift=null,currentCashShift=null,lastTicket=null,lastTickets=[],toastTimer,realtimeChannel=null,realtimeRefreshTimer=null,realtimeLoading=false,gameClockState=null,gameClockSaving=false;
+let db={routes:[],vehicles:[],shifts:[],tickets:[],schedules:[],cards:[],cardTransactions:[],cashShifts:[],news:[],notifications:[]},activeScheduleFolder=null,client=null,currentShift=null,currentCashShift=null,lastTicket=null,lastTickets=[],toastTimer,realtimeChannel=null,realtimeRefreshTimer=null,realtimeLoading=false,gameClockState=null,gameClockSaving=false,notificationsInitialized=false,latestNotificationId=null;
 const statusOptions=['В эксплуатации','На рейсе','Не в эксплуатации','Ремонт','Капитальный ремонт','Списан','Выведен из эксплуатации'];
 function toast(s,type=''){const el=$('toast');el.textContent=s;el.className='toast show '+type;clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3000)}
 function setCloud(s,cls){$('cloudState').className='cloud-state '+cls;$('cloudState').innerHTML='<i></i> '+s}
@@ -400,11 +400,12 @@ function editNews(){showModal('<p class="eyebrow">ГОРОДСКИЕ НОВОС�
 async function archiveRecord(table,id,key='id'){if(table==='conductor_routes'&&currentShift?.route_id===id){toast('Нельзя архивировать маршрут действующего рейса','error');return}if(!confirm('Переместить в архив? Запись можно будет восстановить.'))return;const q=await client.from(table).update({archived_at:new Date().toISOString()}).eq(key,id).select().single();if(q.error){toast('Ошибка архива: '+q.error.message,'error');return}await loadData();toast('Запись перемещена в архив','success')}
 async function restoreRecord(table,id,key='id'){const q=await client.from(table).update({archived_at:null}).eq(key,id).select().single();if(q.error){toast('Ошибка восстановления: '+q.error.message,'error');return}await loadData();toast('Запись восстановлена','success')}
 function renderArchive(){const el=$('archiveList');if(!el)return;const items=[...db.vehicles.filter(x=>x.archived_at).map(x=>({table:'conductor_vehicles',id:x.id,label:'Автобус '+x.number+' · '+x.model})),...db.routes.filter(x=>x.archived_at).map(x=>({table:'conductor_routes',id:x.id,label:'Маршрут '+x.name})),...db.tickets.filter(x=>x.archived_at).map(x=>({table:'conductor_tickets',id:String(x.ticket_number),label:'Билет №'+x.ticket_number})),...db.news.filter(x=>x.archived_at).map(x=>({table:'conductor_news',id:x.id,label:'Новость: '+x.title}))];el.innerHTML=items.length?items.map(x=>'<div class="archive-row"><span>'+esc(x.label)+'</span><button class="table-action" data-restore-table="'+x.table+'" data-restore-id="'+esc(x.id)+'" data-restore-key="'+(x.table==='conductor_tickets'?'ticket_number':'id')+'">Восстановить</button></div>').join(''):'<div class="empty-state">Архив пуст</div>'}
-function renderAll(){renderRouteSelects();renderFleet();renderRoutes();renderCards();renderTickets();renderHistory();renderSchedules();renderStats();renderTripRoutes();renderNews();renderArchive();}
+function renderNotifications(){const el=$('ticketNotifications');if(!el)return;const rows=db.notifications||[];$('notificationCount').textContent=String(rows.length);el.innerHTML=rows.length?rows.map(n=>'<article class="ticket-notification"><div class="ticket-notification-top"><b>'+esc(n.title||'Уведомление')+'</b><time>'+new Date(n.created_at).toLocaleString('ru-RU')+'</time></div><p>'+esc(n.message||'')+'</p><small>Билет № '+esc(n.ticket_number??'—')+'</small></article>').join(''):'<div class="empty-state">Пока нет уведомлений о покупках из Telegram</div>';}
+function renderAll(){renderNotifications();renderRouteSelects();renderFleet();renderRoutes();renderCards();renderTickets();renderHistory();renderSchedules();renderStats();renderTripRoutes();renderNews();renderArchive();}
 async function fetchAllTickets(){const all=[];let start=0;const pageSize=1000;while(true){const q=await client.from('conductor_tickets').select('*').order('ticket_number',{ascending:false}).range(start,start+pageSize-1);if(q.error)throw q.error;const rows=q.data||[];all.push(...rows);if(rows.length<pageSize)break;start+=pageSize;}return all;}
 async function loadData(){
  setCloud('Загрузка базы…','');
- const [r,v,s,t,sch,cards,cardTransactions,cs,news,gc]=await Promise.all([
+ const [r,v,s,t,sch,cards,cardTransactions,cs,news,gc,notifications]=await Promise.all([
   client.from('conductor_routes').select('*').order('city').order('name'),
   client.from('conductor_vehicles').select('*').order('city').order('number'),
   client.from('conductor_shifts').select('*').order('started_at',{ascending:false}).limit(100),
@@ -414,10 +415,14 @@ async function loadData(){
   client.from('conductor_card_transactions').select('*').order('created_at',{ascending:false}).limit(300),
   client.from('conductor_cash_shifts').select('*').order('started_at',{ascending:false}).limit(100),
   client.from('conductor_news').select('*').order('published_at',{ascending:false}).limit(200),
-   client.from('conductor_game_clock').select('*').eq('id','main').maybeSingle()
+   client.from('conductor_game_clock').select('*').eq('id','main').maybeSingle(),
+  client.from('conductor_notifications').select('*').order('created_at',{ascending:false}).limit(20)
   ]);
- for(const [label,x] of [['маршруты',r],['подвижной состав',v],['водительские смены',s],['расписания',sch],['виртуальные карты',cards],['история виртуального банка',cardTransactions],['кассовые смены',cs],['городские новости',news],['игровые часы',gc]])if(x.error)throw new Error(label+': '+x.error.message+' · '+(x.error.code||'без кода'));
- db={routes:(r.data||[]).filter(x=>x.city==='Тверь'),vehicles:(v.data||[]).filter(x=>x.city==='Тверь'),shifts:s.data||[],tickets:t||[],schedules:sch.data||[],cards:cards.data||[],cardTransactions:cardTransactions.data||[],cashShifts:cs.data||[],news:news.data||[]};
+ for(const [label,x] of [['маршруты',r],['подвижной состав',v],['водительские смены',s],['расписания',sch],['виртуальные карты',cards],['история виртуального банка',cardTransactions],['кассовые смены',cs],['городские новости',news],['игровые часы',gc],['уведомления',notifications]])if(x.error)throw new Error(label+': '+x.error.message+' · '+(x.error.code||'без кода'));
+ db={routes:(r.data||[]).filter(x=>x.city==='Тверь'),vehicles:(v.data||[]).filter(x=>x.city==='Тверь'),shifts:s.data||[],tickets:t||[],schedules:sch.data||[],cards:cards.data||[],cardTransactions:cardTransactions.data||[],cashShifts:cs.data||[],news:news.data||[],notifications:notifications.data||[]};
+ const newestNotification=db.notifications[0]||null;
+ if(notificationsInitialized&&newestNotification&&String(newestNotification.id)!==String(latestNotificationId))toast((newestNotification.title||'Новое уведомление')+' · '+(newestNotification.message||''),'success');
+ latestNotificationId=newestNotification?String(newestNotification.id):null;notificationsInitialized=true;
  currentShift=db.shifts.find(s=>s.status==='open')||null;currentCashShift=db.cashShifts.find(s=>s.status==='open')||null;gameClockState=gc.data||null;
  if(currentShift){const activeRoute=db.routes.find(r=>r.id===currentShift.route_id&&!r.archived_at);if(activeRoute){const max=activeRoute.stops.length-1,current=Math.max(0,Math.min(Number(currentShift.current_stop_index||0),max)),end=Math.max(current,Math.min(Number(currentShift.end_stop_index??max),max));if(current!==currentShift.current_stop_index||end!==currentShift.end_stop_index){const fixed=await client.from('conductor_shifts').update({current_stop_index:current,end_stop_index:end}).eq('id',currentShift.id).select().single();if(!fixed.error){currentShift=fixed.data;db.shifts=db.shifts.map(s=>s.id===fixed.data.id?fixed.data:s)}}}}
  setCloud('База синхронизирована','ok');renderAll();renderGameClock();
