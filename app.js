@@ -204,11 +204,9 @@ function ticketPrint(tickets){
  window.onafterprint=()=>{document.body.classList.remove('print-ticket');root.remove()};
 }
 function showPhoneQr(){
- if(!currentCashShift){toast('Сначала открой кассовую смену','error');return}
- const routeId=$('saleRoute').value||(currentShift?.route_id||'');
- const base=location.href.split('?')[0].replace('index.html','').replace(/#.*$/,'');
- const url=base+'pay.html?cash='+encodeURIComponent(currentCashShift.id)+(currentShift?'&shift='+encodeURIComponent(currentShift.id):'')+(routeId?'&route='+encodeURIComponent(routeId):'');
- showModal('<p class="eyebrow">ПОКУПКА НА ТЕЛЕФОНЕ</p><h2>QR-код для телефона</h2><p class="hint">На другом устройстве открой камеру и наведи её на этот код. Откроется форма выбора остановки и оплаты.</p><div id="phoneQr" class="phone-qr"></div><p class="hint">'+esc(url)+'</p>');
+ const base=location.href.split('?')[0].replace(/index\\.html$/,'').replace(/#.*$/,'');
+ const url=base+'pay.html';
+ showModal('<p class="eyebrow">ПОСТОЯННЫЙ QR-КОД</p><h2>Покупка билета на телефоне</h2><p class="hint">Этот QR-код не меняется при открытии и закрытии кассовых смен. Страница покупки откроется в любое время. Для оформления билета касса и рейс должны быть активны.</p><div id="phoneQr" class="phone-qr"></div><p class="hint">'+esc(url)+'</p>');
  new QRCode($('phoneQr'),{text:url,width:220,height:220,correctLevel:QRCode.CorrectLevel.M});
 }
 async function openPayment(){
