@@ -137,13 +137,15 @@ function updateTotal(){
  return {r,a,b,count,qty,mult,per,total,valid};
 }
 async function finish(method){
- const x=updateTotal();if(!x.valid){toast('Выбери активный маршрут и допустимую остановку назначения','error');return}
+ const x=updateTotal();if(!x.valid){toast('Выбери маршрут и остановку назначения','error');return}
  const btn=method==='cash'?$('payCash'):$('payByCard');btn.disabled=true;btn.textContent='Проверка…';
  try{
-  const freshCash=await client.from('conductor_cash_shifts').select('id,status').eq('id',cashShiftId).maybeSingle();if(freshCash.error)throw freshCash.error;if(freshCash.data?.status!=='open')throw new Error('Кассовая смена уже закрыта. Обнови QR-код у кассира.');if(shiftId){const freshDriver=await client.from('conductor_shifts').select('id,status').eq('id',shiftId).maybeSingle();if(freshDriver.error)throw freshDriver.error;if(freshDriver.data?.status!=='open')throw new Error('Рейс уже завершён. Обнови QR-код у кассира.');}
-   const clockResult=await client.from('conductor_game_clock').select('*').eq('id','main').single();if(clockResult.error)throw clockResult.error;const clock=clockResult.data,base=Date.parse(clock.base_time),updated=Date.parse(clock.updated_at),elapsed=clock.is_paused?0:Math.max(0,Date.now()-(Number.isFinite(updated)?updated:Date.now()))*Number(clock.rate||1),gameTime=new Date((Number.isFinite(base)?base:Date.now())+elapsed).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const freshCash=await client.from('conductor_cash_shifts').select('id,status').eq('status','open').order('started_at',{ascending:false}).limit(1).maybeSingle();if(freshCash.error)throw freshCash.error;if(!freshCash.data)throw new Error('Кассовая смена сейчас закрыта. Покупка станет доступна после открытия кассы.');
+  const freshDriver=await client.from('conductor_shifts').select('*').eq('status','open').eq('route_id',x.r.id).order('started_at',{ascending:false}).limit(1).maybeSingle();if(freshDriver.error)throw freshDriver.error;if(!freshDriver.data)throw new Error('На выбранном маршруте сейчас нет открытого рейса. Выбери маршрут с действующим рейсом.');
+  const activeCashShiftId=freshCash.data.id,activeDriverShift=freshDriver.data;
+  const clockResult=await client.from('conductor_game_clock').select('*').eq('id','main').single();if(clockResult.error)throw clockResult.error;const clock=clockResult.data,base=Date.parse(clock.base_time),updated=Date.parse(clock.updated_at),elapsed=clock.is_paused?0:Math.max(0,Date.now()-(Number.isFinite(updated)?updated:Date.now()))*Number(clock.rate||1),gameTime=new Date((Number.isFinite(base)?base:Date.now())+elapsed).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
   const fare=x.mult===.5?'Льготный':x.mult===.75?'Школьный':'Полный';
-  const rows=Array.from({length:x.qty},()=>({shift_id:shift?.id||null,cash_shift_id:cashShiftId,route_id:x.r.id,route_name:x.r.name,from_stop:x.r.stops[x.a],to_stop:x.r.stops[x.b],stop_count:x.count,fare_type:fare,fare_multiplier:x.mult,fare_per_stop:x.per,amount:Number((x.count*x.per*x.mult).toFixed(2)),payment_method:method,cash_received:method==='cash'?Number((x.total/x.qty).toFixed(2)):Number((x.total/x.qty).toFixed(2)),change_due:0,game_time:gameTime}));
+  const rows=Array.from({length:x.qty},()=>({shift_id:activeDriverShift.id,cash_shift_id:activeCashShiftId,route_id:x.r.id,route_name:x.r.name,from_stop:x.r.stops[x.a],to_stop:x.r.stops[x.b],stop_count:x.count,fare_type:fare,fare_multiplier:x.mult,fare_per_stop:x.per,amount:Number((x.count*x.per*x.mult).toFixed(2)),payment_method:method,cash_received:method==='cash'?Number((x.total/x.qty).toFixed(2)):Number((x.total/x.qty).toFixed(2)),change_due:0,game_time:gameTime}));
   let tickets;
   if(method==='card'){
    const cardId=$('payCard').value;if(!cardId)throw new Error('Выбери виртуальную карту');
@@ -158,26 +160,24 @@ async function finish(method){
  }catch(e){$('payResult').innerHTML='<div class="pay-fail">'+e.message+'</div>';toast('Оплата не прошла: '+e.message,'error');btn.disabled=false;btn.textContent=method==='cash'?'Наличными':'Оплатить картой'}
 }
 async function init(){
- if(!cashShiftId){$('payStatus').textContent='QR-код без кассовой смены';toast('Неверная ссылка: нет номера кассовой смены','error');return}
  try{
   const [s,cs,r,c,t]=await Promise.all([
-   client.from('conductor_shifts').select('*').eq('id',shiftId).maybeSingle(),
-   client.from('conductor_cash_shifts').select('*').eq('id',cashShiftId).maybeSingle(),
+   client.from('conductor_shifts').select('*').eq('status','open').order('started_at',{ascending:false}).limit(100),
+   client.from('conductor_cash_shifts').select('*').eq('status','open').order('started_at',{ascending:false}).limit(1),
    client.from('conductor_routes').select('*').eq('city','Тверь').is('archived_at',null).order('name'),
    client.from('conductor_cards').select('*').order('holder'),
    client.from('conductor_card_transactions').select('*').order('created_at',{ascending:false}).limit(300)
   ]);
   if(s.error)throw s.error;if(cs.error)throw cs.error;if(r.error)throw r.error;if(c.error)throw c.error;if(t.error)throw t.error;
-  shift=s.data;if(shiftId&&(!shift||shift.status!=='open'))throw new Error('Рейс уже завершён');
-  if(!cs.data||cs.data.status!=='open')throw new Error('Кассовая смена уже закрыта. Попроси кассира открыть новую кассу и показать новый QR-код.');
+  const activeShifts=s.data||[];shift=shiftId?activeShifts.find(x=>x.id===shiftId)||null:null;
   routes=(r.data||[]).filter(x=>!x.archived_at);cards=c.data||[];cardTransactions=t.data||[];
   fill($('payRoute'),routes.map(x=>({value:x.id,label:x.name})),'Выбери маршрут');
-  if(routeParam&&routes.some(x=>x.id===routeParam))$('payRoute').value=routeParam;else if(shift?.route_id)$('payRoute').value=shift.route_id;
+  if(routeParam&&routes.some(x=>x.id===routeParam))$('payRoute').value=routeParam;else if(shift?.route_id)$('payRoute').value=shift.route_id;else if(activeShifts.length&&routes.some(x=>x.id===activeShifts[0].route_id))$('payRoute').value=activeShifts[0].route_id;
   refillCardSelector();
-  $('payRoute').onchange=()=>{route=null;updateStops()};$('payFrom').onchange=updateStops;$('payTo').onchange=updateTotal;$('payFare').onchange=updateTotal;$('payQty').oninput=updateTotal;$('payCard').onchange=renderBank;$('payRandomCard').onclick=()=>{const x=updateTotal(),eligible=cards.filter(c=>Number(c.balance)>=Number(x.total||0)),pool=eligible.length?eligible:cards;if(!pool.length){toast('Сначала выпусти виртуальную карту','error');return}$('payCard').value=pool[Math.floor(Math.random()*pool.length)].id;renderBank();toast('Случайная карта выбрана','success')};$('bankTopUp').onclick=()=>adjustBankBalance('top_up');$('bankWithdraw').onclick=()=>adjustBankBalance('withdrawal');$('bankEmpty').onclick=()=>adjustBankBalance('empty');$('toggleCreateCard').onclick=()=>{$('createBankCardPanel').hidden=!$('createBankCardPanel').hidden;if(!$('createBankCardPanel').hidden&&!$('newCardNumber').value)$('newCardNumber').value=randomVirtualCardNumber()};$('newCardNumber').oninput=()=>{$('newCardNumber').value=$('newCardNumber').value.replace(/\D/g,'').slice(0,16)};$('createBankCard').onclick=createBankCard;
+  $('payRoute').onchange=()=>{route=null;shift=activeShifts.find(x=>x.route_id===$('payRoute').value)||null;updateStops()};$('payFrom').onchange=updateStops;$('payTo').onchange=updateTotal;$('payFare').onchange=updateTotal;$('payQty').oninput=updateTotal;$('payCard').onchange=renderBank;$('payRandomCard').onclick=()=>{const x=updateTotal(),eligible=cards.filter(c=>Number(c.balance)>=Number(x.total||0)),pool=eligible.length?eligible:cards;if(!pool.length){toast('Сначала выпусти виртуальную карту','error');return}$('payCard').value=pool[Math.floor(Math.random()*pool.length)].id;renderBank();toast('Случайная карта выбрана','success')};$('bankTopUp').onclick=()=>adjustBankBalance('top_up');$('bankWithdraw').onclick=()=>adjustBankBalance('withdrawal');$('bankEmpty').onclick=()=>adjustBankBalance('empty');$('toggleCreateCard').onclick=()=>{$('createBankCardPanel').hidden=!$('createBankCardPanel').hidden;if(!$('createBankCardPanel').hidden&&!$('newCardNumber').value)$('newCardNumber').value=randomVirtualCardNumber()};$('newCardNumber').oninput=()=>{$('newCardNumber').value=$('newCardNumber').value.replace(/\D/g,'').slice(0,16)};$('createBankCard').onclick=createBankCard;
   $('payCash').onclick=()=>finish('cash');$('payByCard').onclick=()=>finish('card');
   if(shift?.route_id&&routes.some(x=>x.id===shift.route_id))$('payRoute').value=shift.route_id;
-  updateStops();$('payStatus').textContent='Кассовая смена открыта';$('payStatus').className='shift-badge open';
+  updateStops();const cashOpen=(cs.data||[]).length>0;$('payStatus').textContent=cashOpen?'Готово к покупке':'Касса закрыта · просмотр доступен';$('payStatus').className='shift-badge '+(cashOpen?'open':'');
  }catch(e){$('payStatus').textContent='Нет активной смены';toast(e.message,'error')}
 }
 init();
