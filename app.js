@@ -204,7 +204,7 @@ function ticketPrint(tickets){
  window.onafterprint=()=>{document.body.classList.remove('print-ticket');root.remove()};
 }
 function showPhoneQr(){
- const base=location.href.split('?')[0].replace(/index\\.html$/,'').replace(/#.*$/,'');
+ const base=location.href.split('?')[0].replace('index.html','').replace(/#.*$/,'');
  const url=base+'pay.html';
  showModal('<p class="eyebrow">ПОСТОЯННЫЙ QR-КОД</p><h2>Покупка билета на телефоне</h2><p class="hint">Этот QR-код не меняется при открытии и закрытии кассовых смен. Страница покупки откроется в любое время. Для оформления билета касса и рейс должны быть активны.</p><div id="phoneQr" class="phone-qr"></div><p class="hint">'+esc(url)+'</p>');
  new QRCode($('phoneQr'),{text:url,width:220,height:220,correctLevel:QRCode.CorrectLevel.M});
