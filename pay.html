@@ -131,7 +131,7 @@ function updateTotal(){
  const r=routes.find(x=>x.id===$('payRoute').value&&!x.archived_at),a=Number($('payFrom').value),b=Number($('payTo').value);
  const sameShiftRoute=!!r&&!!shift&&r.id===shift.route_id,start=r?(sameShiftRoute?Math.max(0,Math.min(Number(shift.current_stop_index||0),r.stops.length-1)):a):0;
  const end=r?(sameShiftRoute?Math.max(start,Math.min(Number(shift.end_stop_index??r.stops.length-1),r.stops.length-1)):r.stops.length-1):-1;
- const valid=!!cashShiftId&&!!r&&Number.isInteger(a)&&Number.isInteger(b)&&a===start&&b>a&&b<=end;
+ const valid=!!r&&Number.isInteger(a)&&Number.isInteger(b)&&a===start&&b>a&&b<=end;
  const count=valid?b-a:0,qty=Math.max(1,Math.min(20,Number($('payQty').value)||1)),mult=Number($('payFare').value||1),per=Number(r?.fare_per_stop||0),total=count*qty*mult*per;
  $('payStops').textContent=valid?count:'—';$('payPer').textContent=r?money(per):'—';$('payTotal').textContent=money(total);
  return {r,a,b,count,qty,mult,per,total,valid};
