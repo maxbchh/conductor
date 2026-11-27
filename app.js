@@ -211,7 +211,7 @@ function showPhoneQr(){
 }
 function openUniversalVoucher(){
  if(!currentCashShift){toast('Сначала открой кассовую смену в разделе «Касса»','error');return}
- const qty=Math.max(1,Math.min(100,Math.floor(Number(prompt('Сколько универсальных талонов продать?','1'))||1)));
+ const rawQty=prompt('Сколько универсальных талонов продать?','1');if(rawQty===null)return;const qty=Number(rawQty);if(!Number.isInteger(qty)||qty<1||qty>100){toast('Укажи целое количество от 1 до 100','error');return}
  const x={valid:true,universal:true,r:{id:null,name:'Универсальный талон',stops:['Универсальный талон','Универсальный талон']},a:0,b:1,stops:1,mult:1,per:1.33,qty,total:Number((1.33*qty).toFixed(2)),name:'Универсальный талон'};
  openVoucherPayment(x);
 }
